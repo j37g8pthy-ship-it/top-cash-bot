@@ -1,0 +1,21 @@
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROUP_ID = int(os.getenv("GROUP_ID", "-1005319609296"))
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "123456789").split(",")))
+TIMEZONE = "Asia/Baghdad"
+OPEN_HOUR, OPEN_MINUTE = 11, 0
+CLOSE_HOUR, CLOSE_MINUTE = 21, 0
+WARNING_MINUTES = 10
+CACHE_TTL = 3600
+MAX_RETRIES = 3
+RETRY_DELAY = 2
+FAST_MODE_THRESHOLD = 0.85
+BANNED_WORDS = ["سبام", "spam"]
+MAX_WARNINGS = 3
+SPAM_WINDOW = 60
+MAX_MSGS_PER_WINDOW = 5
+DB_PATH = "top_cash.db"
+BACKUP_DIR = "backups"
