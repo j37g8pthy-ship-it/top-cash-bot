@@ -8,52 +8,31 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# ===== الكلاينتس =====
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Gemini اختياري
 gemini_model = None
 if GEMINI_API_KEY:
     try:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         gemini_model = genai.GenerativeModel("gemini-2.0-flash-lite")
-        logger.info("✅ Gemini loaded as fallback")
+        logger.info("✅ Gemini loaded")
     except Exception as e:
-        logger.warning(f"⚠️ Gemini not available: {e}")
+        logger.warning(f"⚠️ Gemini غير متوفر: {e}")
 
-SYSTEM_PROMPT = """
-أنت TOP CASH AI، موظف دعم رسمي ومحترف لمنصة TOP CASH.
+SYSTEM_PROMPT = """أنت TOP CASH AI، موظف دعم رسمي لمنصة TOP CASH.
 
 قواعد صارمة:
-1. ترد باللغة العربية أو اللهجة العراقية حسب السؤال.
+1. ترد باللغة العربية أو اللهجة العراقية.
 2. تبدأ دائماً بـ: أهلاً بك 🌹
-3. ردودك مختصرة وواضحة واحترافية.
-4. إذا لم تعرف الإجابة بشكل مؤكد قل:
-   "عذرًا، لا أملك معلومات مؤكدة. سيتم تحويل سؤالك للإدارة."
-5. لا تخترع أو تخمّن.
-6. لا تتحدث خارج نطاق TOP CASH.
-7. تعامل بالاحترام والتهذيب.
+3. إذا وُجدت معلومات في قاعدة المعرفة استخدمها مباشرة ولا تتجاهلها أبداً.
+4. إذا لم تعرف قل: عذرًا، لا أملك معلومات مؤكدة. سيتم تحويل سؤالك للإدارة.
+5. لا تخترع أرقاماً أو معلومات.
+6. ردودك مختصرة وواضحة."""
 
-معلومات المنصة:
-- TOP CASH منصة مالية تقدم أرباحاً للأعضاء.
-- ثلاثة مستويات: TOP 1، TOP 2، TOP 3.
-- الدعم: 11 صباحاً - 9 مساءً بتوقيت العراق.
-"""
-
-# ===== Fast Mode =====
 FAST_RESPONSES = {
-    r"(وقت|ساعة|دوام|فتح|غلق)": (
-        "⏰ ساعات الدوام:\n"
-        "• الفتح: 11:00 صباحاً\n"
-        "• الإغلاق: 9:00 مساءً\n"
-        "بتوقيت العراق 🇮🇶"
-    ),
-    r"(شكر|شكراً|مشكور|يسلمو)": "أهلاً بك 🌹 دائماً في خدمتكم 💙",
-    r"^(السلام|هلو|هاي|مرحبا|أهلا|هلا)$": (
-        "أهلاً وسهلاً بك 🌹\n"
-        "كيف يمكنني مساعدتك اليوم؟"
-    ),
+    r"^(السلام|هلو|هاي|مرحبا|أهلا|هلا|صباح|مساء)": "أهلاً وسهلاً بك 🌹\nكيف يمكنني مساعدتك؟",
+    r"(شكر|شكراً|مشكور|يسلمو|ثانكس)": "أهلاً بك 🌹 دائماً في خدمتكم 💙",
 }
 
 def fast_mode_check(text: str) -> str | None:
@@ -68,8 +47,8 @@ async def call_groq(messages: list) -> str:
             response = groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                max_tokens=300,
-                temperature=0.7,
+                max_tokens=400,
+                temperature=0.5,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -99,16 +78,24 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
         db.log_conversation(user_id, user_question, cached, "cache", time.time()-start)
         return cached, "cache"
 
-    # 3️⃣ قاعدة المعرفة
+    # 3️⃣ قاعدة المعرفة - البحث المباشر
     knowledge = db.search_knowledge(user_question)
-    context = ""
+    
     if knowledge:
-        context = "معلومات من قاعدة المعرفة:\n" + "\n".join(knowledge) + "\n\n"
-
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"{context}سؤال العضو: {user_question}"}
-    ]
+        # إذا وجد معلومة في قاعدة المعرفة - استخدمها مباشرة مع AI
+        context = "معلومات مؤكدة من قاعدة البيانات (استخدمها بالكامل في ردك):\n"
+        context += "\n".join(knowledge)
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"{context}\n\nسؤال العضو: {user_question}\n\nمهم: استخدم المعلومات أعلاه في ردك بشكل كامل ودقيق."}
+        ]
+    else:
+        # لا توجد معلومات - رد عام
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"سؤال العضو: {user_question}"}
+        ]
 
     # 4️⃣ Groq
     try:
@@ -119,23 +106,19 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
             db.log_unknown(user_id, user_question)
         return answer, "groq"
     except Exception as groq_error:
-        logger.warning(f"⚠️ Groq failed: {groq_error} — trying Gemini")
+        logger.warning(f"⚠️ Groq failed: {groq_error}")
 
     # 5️⃣ Gemini Fallback
     try:
-        full_prompt = f"{SYSTEM_PROMPT}\n\n{context}سؤال العضو: {user_question}"
+        context = "\n".join(knowledge) if knowledge else ""
+        full_prompt = f"{SYSTEM_PROMPT}\n\n{context}\n\nسؤال: {user_question}"
         answer = await call_gemini(full_prompt)
         db.set_cache(user_question, answer, CACHE_TTL)
         db.log_conversation(user_id, user_question, answer, "gemini", time.time()-start)
         return answer, "gemini"
-    except Exception as gemini_error:
-        logger.error(f"❌ Gemini failed: {gemini_error}")
+    except Exception as e:
+        logger.error(f"❌ All AI failed: {e}")
 
-    # 6️⃣ Fallback نهائي
-    fallback = (
-        "أهلاً بك 🌹\n\n"
-        "عذرًا، النظام مشغول حالياً.\n"
-        "يرجى إعادة المحاولة بعد دقيقة أو التواصل مع الإدارة. 💙"
-    )
-    db.log_conversation(user_id, user_question, fallback, "fallback", time.time()-start)
+    # 6️⃣ Fallback
+    fallback = "أهلاً بك 🌹\nعذرًا، النظام مشغول حالياً. يرجى المحاولة بعد دقيقة. 💙"
     return fallback, "fallback"
