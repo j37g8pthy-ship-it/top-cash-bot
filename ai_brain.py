@@ -82,16 +82,13 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
     knowledge = db.search_knowledge(user_question)
     
     if knowledge:
-        # إذا وجد معلومة في قاعدة المعرفة - استخدمها مباشرة مع AI
-        context = "معلومات مؤكدة من قاعدة البيانات (استخدمها بالكامل في ردك):\n"
-        context += "\n".join(knowledge)
-        
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"{context}\n\nسؤال العضو: {user_question}\n\nمهم: استخدم المعلومات أعلاه في ردك بشكل كامل ودقيق."}
-        ]
+        # رد مباشر من قاعدة المعرفة بدون AI
+        answer = "أهلاً بك 🌹\n\n" + "\n\n".join(knowledge)
+        db.set_cache(user_question, answer, CACHE_TTL)
+        db.log_conversation(user_id, user_question, answer, "knowledge", time.time()-start)
+        return answer, "knowledge"
     else:
-        # لا توجد معلومات - رد عام
+        # لا توجد معلومات - استخدم AI
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"سؤال العضو: {user_question}"}
