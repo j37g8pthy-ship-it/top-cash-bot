@@ -21,7 +21,6 @@ class Database:
     def _init_db(self):
         with self._conn() as c:
             c.executescript("""
-                -- قاعدة المعرفة
                 CREATE TABLE IF NOT EXISTS knowledge (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     question TEXT NOT NULL,
@@ -31,8 +30,6 @@ class Database:
                     source TEXT DEFAULT 'admin',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- ذاكرة المستخدمين
                 CREATE TABLE IF NOT EXISTS user_memory (
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
@@ -45,8 +42,6 @@ class Database:
                     notes TEXT,
                     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- سجل المحادثات
                 CREATE TABLE IF NOT EXISTS conversations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -56,8 +51,6 @@ class Database:
                     response_time REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- كاش الردود
                 CREATE TABLE IF NOT EXISTS response_cache (
                     question_hash TEXT PRIMARY KEY,
                     question TEXT,
@@ -66,8 +59,6 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP
                 );
-
-                -- الأسئلة غير المعروفة
                 CREATE TABLE IF NOT EXISTS unknown_questions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -76,24 +67,18 @@ class Database:
                     admin_answer TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- سجل الأحداث
                 CREATE TABLE IF NOT EXISTS events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     type TEXT,
                     data TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- سجل الأخطاء
                 CREATE TABLE IF NOT EXISTS errors (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     error TEXT,
                     context TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- تتبع السبام
                 CREATE TABLE IF NOT EXISTS message_track (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -103,12 +88,10 @@ class Database:
             """)
         logger.info("✅ Database ready")
 
-    # ===== قاعدة المعرفة =====
     def add_knowledge(self, question: str, answer: str, category: str = "general", source: str = "admin"):
         with self._conn() as c:
             c.execute("INSERT INTO knowledge (question, answer, category, source) VALUES (?,?,?,?)",
                       (question, answer, category, source))
-        logger.info(f"✅ Knowledge added: {question[:50]}")
 
     def update_knowledge(self, kid: int, question: str, answer: str):
         with self._conn() as c:
@@ -119,21 +102,48 @@ class Database:
             c.execute("DELETE FROM knowledge WHERE id=?", (kid,))
 
     def search_knowledge(self, query: str, limit: int = 3) -> list:
+        """بحث محسّن بالجملة أولاً ثم بكلمات منفردة"""
         with self._conn() as c:
+            results = []
+            seen = set()
+
+            # بحث بالجملة كاملة
             rows = c.execute("""
-                SELECT id, answer, hits FROM knowledge
-                WHERE question LIKE ? OR answer LIKE ? OR category LIKE ?
-                ORDER BY hits DESC, created_at DESC LIMIT ?
-            """, (f"%{query}%", f"%{query}%", f"%{query}%", limit)).fetchall()
+                SELECT id, answer FROM knowledge
+                WHERE question LIKE ? OR answer LIKE ?
+                ORDER BY hits DESC LIMIT ?
+            """, (f"%{query}%", f"%{query}%", limit)).fetchall()
+
             for row in rows:
-                c.execute("UPDATE knowledge SET hits = hits + 1 WHERE id=?", (row["id"],))
-            return [row["answer"] for row in rows]
+                if row["id"] not in seen:
+                    results.append(row["answer"])
+                    seen.add(row["id"])
+                    c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (row["id"],))
+
+            # إذا ما لقى - ابحث بكلمات منفردة
+            if not results:
+                for word in query.split():
+                    if len(word) < 2:
+                        continue
+                    rows = c.execute("""
+                        SELECT id, answer FROM knowledge
+                        WHERE question LIKE ?
+                        ORDER BY hits DESC LIMIT 2
+                    """, (f"%{word}%",)).fetchall()
+                    for row in rows:
+                        if row["id"] not in seen:
+                            results.append(row["answer"])
+                            seen.add(row["id"])
+                            c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (row["id"],))
+                    if results:
+                        break
+
+            return results[:limit]
 
     def get_all_knowledge(self) -> list:
         with self._conn() as c:
             return c.execute("SELECT * FROM knowledge ORDER BY category, created_at").fetchall()
 
-    # ===== ذاكرة المستخدمين =====
     def upsert_user(self, user_id: int, username: str = None, first_name: str = None):
         with self._conn() as c:
             exists = c.execute("SELECT user_id FROM user_memory WHERE user_id=?", (user_id,)).fetchone()
@@ -173,7 +183,6 @@ class Database:
         with self._conn() as c:
             c.execute("UPDATE user_memory SET subscription_level=? WHERE user_id=?", (level, user_id))
 
-    # ===== كاش الردود =====
     def get_cache(self, question: str) -> str | None:
         import hashlib
         qhash = hashlib.md5(question.encode()).hexdigest()
@@ -194,7 +203,6 @@ class Database:
                          VALUES (?, ?, ?, datetime('now', ? || ' seconds'))""",
                       (qhash, question, answer, str(ttl)))
 
-    # ===== المحادثات =====
     def log_conversation(self, user_id: int, question: str, answer: str,
                           source: str = "ai", response_time: float = 0):
         with self._conn() as c:
@@ -214,7 +222,6 @@ class Database:
             return c.execute("""SELECT * FROM unknown_questions WHERE answered=0
                                 ORDER BY created_at DESC LIMIT ?""", (limit,)).fetchall()
 
-    # ===== تتبع السبام =====
     def track_msg(self, user_id: int, text: str):
         with self._conn() as c:
             c.execute("INSERT INTO message_track (user_id, msg_text) VALUES (?,?)", (user_id, text))
@@ -234,7 +241,6 @@ class Database:
                             (user_id, text, f"-{window}")).fetchone()
             return row["cnt"] if row else 0
 
-    # ===== الإحصائيات =====
     def get_stats(self) -> dict:
         today = date.today().isoformat()
         with self._conn() as c:
@@ -250,7 +256,6 @@ class Database:
             unknowns = c.execute("SELECT COUNT(*) as n FROM unknown_questions WHERE answered=0").fetchone()["n"]
             top_knowledge = c.execute("""SELECT question, hits FROM knowledge
                                           ORDER BY hits DESC LIMIT 3""").fetchall()
-
         return {
             "total_users": total_users,
             "active_today": active_today,
@@ -261,7 +266,6 @@ class Database:
             "top_knowledge": [(r["question"], r["hits"]) for r in top_knowledge],
         }
 
-    # ===== الأحداث والأخطاء =====
     def log_event(self, etype: str, data: dict = {}):
         with self._conn() as c:
             c.execute("INSERT INTO events (type, data) VALUES (?,?)",
@@ -271,7 +275,6 @@ class Database:
         with self._conn() as c:
             c.execute("INSERT INTO errors (error, context) VALUES (?,?)", (error, context))
 
-    # ===== النسخ الاحتياطية =====
     def backup(self) -> str:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(BACKUP_DIR, f"backup_{ts}.db")
