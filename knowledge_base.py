@@ -1,85 +1,56 @@
-"""
-قاعدة معرفة TOP CASH - أضف معلومات المنصة الحقيقية هنا
-"""
 from database import db
 
 KNOWLEDGE = {
+    "السحب": {
+        "category": "مالي",
+        "question": "السحب كيف السحب طريقة السحب",
+        "answer": "💸 جدول السحب في TOP CASH:\n📅 أيام السحب: من الأحد إلى الخميس\n⚡ السحب الفوري: خلال 5 دقائق — عمولة 35%\n🕒 السحب العادي: خلال 72 ساعة — عمولة 10%\n📌 تأكد من صحة بيانات محفظتك قبل الإرسال."
+    },
     "top1": {
         "category": "مستويات",
-        "question": "TOP 1 ما هو",
-        "answer": "📌 TOP 1 - المستوى الأول:\n[أضف تفاصيل TOP 1 هنا]"
+        "question": "TOP 1 ما هو باقة top1",
+        "answer": "🥉 باقة TOP-1:\n💳 سعر الاشتراك: 75$\n💰 الربح اليومي: 3$\n📅 الربح الشهري: 90$\n📈 الربح السنوي: 1095$\n🎁 مكافأة الإحالة: 7.5$"
     },
     "top2": {
         "category": "مستويات",
-        "question": "TOP 2 ما هو",
-        "answer": "📌 TOP 2 - المستوى الثاني:\n[أضف تفاصيل TOP 2 هنا]"
+        "question": "TOP 2 ما هو باقة top2",
+        "answer": "🥈 باقة TOP-2:\n💳 سعر الاشتراك: 150$\n💰 الربح اليومي: 6$\n📅 الربح الشهري: 180$\n📈 الربح السنوي: 2190$\n🎁 مكافأة الإحالة: 15$"
     },
     "top3": {
         "category": "مستويات",
-        "question": "TOP 3 ما هو",
-        "answer": "📌 TOP 3 - المستوى الثالث:\n[أضف تفاصيل TOP 3 هنا]"
+        "question": "TOP 3 ما هو باقة top3",
+        "answer": "🥇 باقة TOP-3:\n💳 سعر الاشتراك: 300$\n💰 الربح اليومي: 12$\n📅 الربح الشهري: 360$\n📈 الربح السنوي: 4380$\n🎁 مكافأة الإحالة: 30$"
     },
-    "withdrawal": {
-        "category": "مالي",
-        "question": "كيف السحب طريقة السحب",
-        "answer": (
-            "💰 طريقة السحب:\n"
-            "• الحد الأدنى: [المبلغ]\n"
-            "• مدة المعالجة: [المدة]\n"
-            "• الطريقة: [زين كاش / كي كارد]\n"
-            "[أضف تفاصيل السحب هنا]"
-        )
+    "الباقات": {
+        "category": "مستويات",
+        "question": "الباقات الاشتراك المستويات",
+        "answer": "💎 باقات TOP CASH:\n🥉 TOP-1: 75$ — ربح يومي 3$\n🥈 TOP-2: 150$ — ربح يومي 6$\n🥇 TOP-3: 300$ — ربح يومي 12$\nتبدأ الأرباح بعد تفعيل الاشتراك مباشرة."
     },
-    "deposit": {
-        "category": "مالي",
-        "question": "كيف الإيداع طريقة الإيداع",
-        "answer": "💳 طريقة الإيداع:\n[أضف تفاصيل الإيداع هنا]"
+    "الإحالة": {
+        "category": "مكافآت",
+        "question": "مكافأة الإحالة الإحالة",
+        "answer": "🎁 مكافأة الإحالة في TOP CASH:\n🥉 TOP-1: 7.5$\n🥈 TOP-2: 15$\n🥇 TOP-3: 30$\nتُمنح مرة واحدة عند اشتراك العضو الجديد."
     },
-    "profits": {
-        "category": "مالي",
-        "question": "الأرباح كيف الربح",
-        "answer": "📈 نظام الأرباح:\n[أضف تفاصيل الأرباح هنا]"
-    },
-    "tasks": {
+    "الفيديو": {
         "category": "مهام",
-        "question": "المهام اليومية",
-        "answer": "✅ المهام اليومية:\n[أضف تفاصيل المهام هنا]"
+        "question": "مهمة الفيديو فيديو مشاهدات",
+        "answer": "🎬 مهمة الفيديو:\nانشر فيديو يروج للمنصة.\nإذا حصل على 100,000 مشاهدة تحصل على 10$.\nأرسل صورة من حسابك مع ID للإدارة."
     },
-    "upgrade": {
-        "category": "ترقية",
-        "question": "الترقية كيف أترقى",
-        "answer": "⬆️ نظام الترقية:\n[أضف شروط الترقية هنا]"
-    },
-    "rules": {
-        "category": "قوانين",
-        "question": "القوانين والتعليمات",
-        "answer": "📜 قوانين المنصة:\n[أضف القوانين هنا]"
+    "الدوام": {
+        "category": "عام",
+        "question": "وقت الدوام ساعات العمل فتح غلق",
+        "answer": "⏰ ساعات الدوام:\n• الفتح: 11:00 صباحاً\n• الإغلاق: 9:00 مساءً\nبتوقيت العراق 🇮🇶"
     },
 }
 
 def init_knowledge():
-    """تهيئة قاعدة المعرفة الأساسية عند أول تشغيل"""
-    existing = db.get_all_knowledge()
-    if not existing:
-        for key, item in KNOWLEDGE.items():
+    for key, item in KNOWLEDGE.items():
+        results = db.search_knowledge(item["question"])
+        if not results:
             db.add_knowledge(
                 question=item["question"],
                 answer=item["answer"],
                 category=item["category"],
                 source="system"
             )
-        print("✅ تم تهيئة قاعدة المعرفة الأساسية")
-
-def load_pdf(pdf_path: str, category: str = "وثائق"):
-    """تحميل معرفة من PDF"""
-    try:
-        import PyPDF2
-        with open(pdf_path, 'rb') as f:
-            reader = PyPDF2.PdfReader(f)
-            text = "".join(p.extract_text() for p in reader.pages)
-        name = os.path.basename(pdf_path)
-        db.add_knowledge(f"محتوى {name}", text, category, "pdf")
-        return True
-    except Exception as e:
-        print(f"❌ خطأ في تحميل PDF: {e}")
-        return False
+    print("✅ تم تهيئة قاعدة المعرفة")
