@@ -102,43 +102,32 @@ class Database:
             c.execute("DELETE FROM knowledge WHERE id=?", (kid,))
 
     def search_knowledge(self, query: str, limit: int = 3) -> list:
-        """بحث محسّن بالجملة أولاً ثم بكلمات منفردة"""
+        """بحث ذكي بنقاط لكل كلمة"""
         with self._conn() as c:
-            results = []
-            seen = set()
-
-            # بحث بالجملة كاملة
-            rows = c.execute("""
-                SELECT id, answer FROM knowledge
-                WHERE question LIKE ? OR answer LIKE ?
-                ORDER BY hits DESC LIMIT ?
-            """, (f"%{query}%", f"%{query}%", limit)).fetchall()
-
+            rows = c.execute("SELECT id, question, answer, hits FROM knowledge").fetchall()
+            
+            scored = []
+            query_words = [w for w in query.split() if len(w) > 1]
+            
             for row in rows:
-                if row["id"] not in seen:
-                    results.append(row["answer"])
-                    seen.add(row["id"])
-                    c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (row["id"],))
-
-            # إذا ما لقى - ابحث بكلمات منفردة
-            if not results:
-                for word in query.split():
-                    if len(word) < 2:
-                        continue
-                    rows = c.execute("""
-                        SELECT id, answer FROM knowledge
-                        WHERE question LIKE ?
-                        ORDER BY hits DESC LIMIT 2
-                    """, (f"%{word}%",)).fetchall()
-                    for row in rows:
-                        if row["id"] not in seen:
-                            results.append(row["answer"])
-                            seen.add(row["id"])
-                            c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (row["id"],))
-                    if results:
-                        break
-
-            return results[:limit]
+                score = 0
+                q = row["question"].lower()
+                
+                for word in query_words:
+                    if word.lower() in q:
+                        score += 10
+                
+                if score > 0:
+                    scored.append((score + row["hits"], row["id"], row["answer"]))
+            
+            scored.sort(reverse=True)
+            
+            results = []
+            for _, rid, answer in scored[:limit]:
+                results.append(answer)
+                c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (rid,))
+            
+            return results
 
     def get_all_knowledge(self) -> list:
         with self._conn() as c:
