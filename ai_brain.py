@@ -83,11 +83,10 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
     knowledge = db.search_knowledge(user_question)
     
     if knowledge:
-        context = "معلومات من قاعدة البيانات:\n" + "\n".join(knowledge)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"{context}\n\nسؤال العضو: {user_question}\n\nأجب بأسلوبك الخاص مستخدماً المعلومات أعلاه فقط ولا تضف أي أرقام أو معلومات من عندك."}
-        ]
+        answer = "أهلاً بك 🌹\n\n" + "\n\n".join(knowledge)
+        db.set_cache(user_question, answer, CACHE_TTL)
+        db.log_conversation(user_id, user_question, answer, "knowledge", time.time()-start)
+        return answer, "knowledge"
     else:
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
