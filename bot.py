@@ -36,6 +36,24 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         db.log_event("new_member", {"user_id": member.id})
 
+# ===== كلمات التهنئة =====
+CONGRATS_KEYWORDS = [
+    "تم السحب", "وصل السحب", "وصلت الفلوس", "وصل المبلغ",
+    "استلمت", "وصلت ارباحي", "وصل الراتب", "وصل ربحي",
+    "وصل المكسب", "استلمت السحب", "وصلت المبلغ",
+    "تم استلام", "وصل التحويل", "شكرا توب كاش",
+    "شكرا top cash", "شكرا للشركة", "شكرا للادارة",
+]
+
+# ===== كلمات الأسئلة =====
+QUESTION_KEYWORDS = [
+    "؟", "?", "كيف", "ماهو", "ما هو", "وين", "شلون",
+    "متى", "امتى", "هل", "ليش", "ماذا", "اريد", "أريد",
+    "ابي", "ابغى", "بدي", "شو", "ايش", "شقد", "كم",
+    "وش", "ما هي", "ماهي", "شنو", "اشلون", "من وين",
+    "فين", "كيفاش", "علاش", "لماذا", "متين", "وقتاش",
+]
+
 # ===== معالجة الرسائل =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -51,8 +69,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if deleted:
         return
 
+    # ===== فحص كلمات التهنئة =====
+    is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
+    if is_congrats:
+        await msg.reply_text(
+            "🎉 مبروك عليك! 🎉\n\n"
+            "يسعدنا أن سحبك وصل بنجاح 💰\n\n"
+            "نتمنى لك المزيد من الأرباح والنجاح في منصة TOP CASH 🌹\n\n"
+            "💙 إدارة TOP CASH"
+        )
+        return
+
     # ===== تحديد إذا البوت يجب يرد =====
-    is_question = any(c in text for c in ["؟", "?", "كيف", "ماهو", "ما هو", "وين", "شلون", "متى", "هل", "ليش", "ماذا", "اريد", "أريد"])
+    is_question = any(kw in text for kw in QUESTION_KEYWORDS)
     is_mention = context.bot.username and f"@{context.bot.username}" in text
     is_reply_to_bot = (msg.reply_to_message and msg.reply_to_message.from_user
                        and msg.reply_to_message.from_user.is_bot)
@@ -78,17 +107,30 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.photo:
         return
-    photo = msg.photo[-1]
-    if photo.file_size < 15000:
+
+    # فحص كلمات التهنئة في caption الصورة
+    caption = msg.caption or ""
+    is_congrats = any(kw in caption.lower() for kw in CONGRATS_KEYWORDS)
+
+    if is_congrats:
         await msg.reply_text(
-            "⚠️ الصورة غير واضحة أو صغيرة جداً.\n"
-            "يرجى إعادة إرسال صورة الإنجاز بجودة أفضل. 📸"
+            "🎉 مبروك عليك! 🎉\n\n"
+            "يسعدنا أن سحبك وصل بنجاح 💰\n\n"
+            "نتمنى لك المزيد من الأرباح والنجاح في منصة TOP CASH 🌹\n\n"
+            "💙 إدارة TOP CASH"
         )
     else:
-        await msg.reply_text(
-            "✅ تم استلام صورة الإنجاز!\n"
-            "شكراً لك، ستتم المراجعة من قِبل الإدارة. 💙"
-        )
+        photo = msg.photo[-1]
+        if photo.file_size < 15000:
+            await msg.reply_text(
+                "⚠️ الصورة غير واضحة أو صغيرة جداً.\n"
+                "يرجى إعادة إرسال صورة الإنجاز بجودة أفضل. 📸"
+            )
+        else:
+            await msg.reply_text(
+                "✅ تم استلام صورتك!\n"
+                "شكراً لك، ستتم المراجعة من قِبل الإدارة. 💙"
+            )
 
 # ===== معالجة الأخطاء =====
 async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
@@ -106,12 +148,10 @@ async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== تشغيل البوت =====
 def main():
-    # تهيئة قاعدة المعرفة
     init_knowledge()
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # تسجيل المعالجات
     register_admin_handlers(app)
 
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
