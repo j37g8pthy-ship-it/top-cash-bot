@@ -36,7 +36,7 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
     knowledge = db.search_knowledge(user_question)
 
     if knowledge:
-        answer = "اهلاً بك 🌹\n\n" + "\n\n".join(knowledge)
+        answer = "\n\n".join(knowledge)
         db.set_cache(user_question, answer, CACHE_TTL)
         db.log_conversation(user_id, user_question, answer, "knowledge", time.time()-start)
         return answer, "knowledge"
