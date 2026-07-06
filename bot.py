@@ -8,6 +8,7 @@ from database import db
 from scheduler import setup_scheduler
 from admin import register_admin_handlers
 from knowledge_base import init_knowledge
+from ai_brain import set_app
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -163,6 +164,7 @@ async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
 # ===== تشغيل البوت =====
 def main():
     init_knowledge()
+    set_app(app)
 
     app = Application.builder().token(BOT_TOKEN).build()
 
