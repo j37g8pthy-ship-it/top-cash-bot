@@ -2,13 +2,12 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 from config import BOT_TOKEN, ADMIN_IDS
-from ai_brain import get_ai_response
+from ai_brain import get_ai_response, set_app
 from moderation import moderate
 from database import db
 from scheduler import setup_scheduler
 from admin import register_admin_handlers
 from knowledge_base import init_knowledge
-from ai_brain import set_app
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -47,18 +46,14 @@ CONGRATS_KEYWORDS = [
 
 # ===== كلمات الأسئلة والترحيب =====
 QUESTION_KEYWORDS = [
-    # علامات السؤال
     "؟", "?",
-    # كلمات السؤال
     "كيف", "ماهو", "ما هو", "وين", "شلون", "اشلون",
     "متى", "امتى", "متين", "هل", "ليش", "لماذا", "ماذا",
     "اريد", "أريد", "ابي", "ابغى", "بدي",
     "شو", "ايش", "شقد", "كم", "وش", "ما هي", "ماهي",
     "شنو", "من وين", "فين", "كيفاش", "علاش", "وقتاش",
-    # ترحيب
-    "مرحبا", "مرحبً", "هلا", "هلو", "هاي", "السلام",
+    "مرحبا", "هلا", "هلو", "هاي", "السلام",
     "اهلا", "اهلين", "أهلا", "صباح", "مساء",
-    # عضو جديد
     "انا مشترك", "انا عضو", "انا جديد", "وصلت",
     "سجلت", "فعلت حساب", "انضممت",
 ]
@@ -120,7 +115,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.photo:
         return
 
-    # تجاهل صور الأدمن
     if msg.from_user and msg.from_user.id in ADMIN_IDS:
         return
 
@@ -164,9 +158,11 @@ async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
 # ===== تشغيل البوت =====
 def main():
     init_knowledge()
-    set_app(app)
 
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # تعيين app في ai_brain لإرسال الأسئلة للأدمن
+    set_app(app)
 
     register_admin_handlers(app)
 
