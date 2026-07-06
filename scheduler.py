@@ -228,19 +228,19 @@ def setup_scheduler(app):
     scheduler.add_job(tasks_reminder, CronTrigger(hour=14, minute=0, timezone=tz), args=[app])
 
     # تذكير الاجتماع - 3:00 ظهراً (عدا الجمعة والسبت)
-    scheduler.add_job(meeting_reminder, CronTrigger(hour=15, minute=0, day_of_week='sun-thu', timezone=tz), args=[app])
+    scheduler.add_job(meeting_reminder, CronTrigger(hour=15, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
 
     # إرسال الاجتماع - 10:00 مساءً (عدا الجمعة والسبت)
-    scheduler.add_job(send_daily_meeting, CronTrigger(hour=22, minute=0, day_of_week='sun-thu', timezone=tz), args=[app])
+    scheduler.add_job(send_daily_meeting, CronTrigger(hour=22, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
 
     # ختام أسبوعي - الخميس 8:00 مساءً
-    scheduler.add_job(weekly_closing, CronTrigger(hour=20, minute=0, day_of_week='thu', timezone=tz), args=[app])
+    scheduler.add_job(weekly_closing, CronTrigger(hour=20, minute=0, day_of_week='4', timezone=tz), args=[app])
 
     # تهنئة الجمعة - 10:00 صباحاً
-    scheduler.add_job(friday_greeting, CronTrigger(hour=10, minute=0, day_of_week='fri', timezone=tz), args=[app])
+    scheduler.add_job(friday_greeting, CronTrigger(hour=10, minute=0, day_of_week='5', timezone=tz), args=[app])
 
     # تذكير أسبوعي - الأحد 11:30 صباحاً
-    scheduler.add_job(sunday_reminder, CronTrigger(hour=11, minute=30, day_of_week='sun', timezone=tz), args=[app])
+    scheduler.add_job(sunday_reminder, CronTrigger(hour=11, minute=30, day_of_week='0', timezone=tz), args=[app])
 
     # إحصائيات يومية للأدمن - 9:30 مساءً
     scheduler.add_job(daily_stats, CronTrigger(hour=21, minute=30, timezone=tz), args=[app])
