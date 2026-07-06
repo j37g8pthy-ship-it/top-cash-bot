@@ -64,6 +64,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     user_id = user.id
 
+    # ===== تجاهل رسائل الأدمن في المجموعة =====
+    if user_id in ADMIN_IDS:
+        return
+
     # ===== الإشراف والحماية =====
     deleted = await moderate(msg, context)
     if deleted:
@@ -85,9 +89,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_mention = context.bot.username and f"@{context.bot.username}" in text
     is_reply_to_bot = (msg.reply_to_message and msg.reply_to_message.from_user
                        and msg.reply_to_message.from_user.is_bot)
-    is_admin = user_id in ADMIN_IDS
 
-    if not (is_question or is_mention or is_reply_to_bot or is_admin):
+    if not (is_question or is_mention or is_reply_to_bot):
         return
 
     # ===== الحصول على الرد =====
@@ -108,7 +111,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.photo:
         return
 
-    # فحص كلمات التهنئة في caption الصورة
+    # تجاهل صور الأدمن
+    if msg.from_user and msg.from_user.id in ADMIN_IDS:
+        return
+
     caption = msg.caption or ""
     is_congrats = any(kw in caption.lower() for kw in CONGRATS_KEYWORDS)
 
