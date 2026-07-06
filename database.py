@@ -101,33 +101,43 @@ class Database:
         with self._conn() as c:
             c.execute("DELETE FROM knowledge WHERE id=?", (kid,))
 
-    def search_knowledge(self, query: str, limit: int = 3) -> list:
-        """بحث ذكي بنقاط لكل كلمة"""
+    def search_knowledge(self, query: str, limit: int = 1) -> list:
+        """بحث ذكي - يلقى أدق إجابة"""
         with self._conn() as c:
             rows = c.execute("SELECT id, question, answer, hits FROM knowledge").fetchall()
-            
+
             scored = []
-            query_words = [w for w in query.split() if len(w) > 1]
-            
+            query_words = [w for w in query.split() if len(w) > 2]
+
             for row in rows:
                 score = 0
                 q = row["question"].lower()
-                
+
                 for word in query_words:
-                    if word.lower() in q:
+                    w = word.lower()
+                    if w in q:
                         score += 10
-                
+                    elif len(w) >= 4 and w[:4] in q:
+                        score += 5
+                    elif len(w) >= 3 and w[:3] in q:
+                        score += 3
+
                 if score > 0:
-                    scored.append((score + row["hits"], row["id"], row["answer"]))
-            
+                    scored.append((score, row["id"], row["answer"]))
+
+            if not scored:
+                return []
+
             scored.sort(reverse=True)
-            
+            best_score = scored[0][0]
+
             results = []
-            for _, rid, answer in scored[:limit]:
-                results.append(answer)
-                c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (rid,))
-            
-            return results
+            for score, rid, answer in scored:
+                if score == best_score:
+                    results.append(answer)
+                    c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (rid,))
+
+            return results[:limit]
 
     def get_all_knowledge(self) -> list:
         with self._conn() as c:
