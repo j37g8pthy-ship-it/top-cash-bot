@@ -1,6 +1,8 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
+import asyncio
+from datetime import datetime
 from telegram import ChatPermissions
 from telegram.ext import Application
 from config import GROUP_ID, TIMEZONE, OPEN_HOUR, OPEN_MINUTE, CLOSE_HOUR, CLOSE_MINUTE, WARNING_MINUTES, ADMIN_IDS
@@ -58,6 +60,39 @@ async def close_group(app):
     except Exception as e:
         logger.error(f"close_group: {e}")
 
+async def send_daily_meeting(app):
+    """إرسال اجتماع اليوم الساعة 10 مساءً عدا الجمعة والسبت"""
+    try:
+        from meetings import MEETINGS
+        now = datetime.now(tz)
+        
+        # تخطي الجمعة (4) والسبت (5)
+        if now.weekday() in [4, 5]:
+            logger.info("📅 يوم عطلة - لا يوجد اجتماع")
+            return
+        
+        date_str = now.strftime("%Y-%m-%d")
+        
+        if date_str not in MEETINGS:
+            logger.info(f"📅 لا يوجد اجتماع لتاريخ {date_str}")
+            return
+        
+        messages = MEETINGS[date_str]
+        logger.info(f"📢 إرسال اجتماع {date_str} - {len(messages)} رسائل")
+        
+        for i, msg in enumerate(messages):
+            try:
+                await app.bot.send_message(chat_id=GROUP_ID, text=msg)
+                if i < len(messages) - 1:
+                    await asyncio.sleep(30)  # 30 ثانية بين كل رسالة
+            except Exception as e:
+                logger.error(f"خطأ في إرسال رسالة {i+1}: {e}")
+                
+        logger.info(f"✅ تم إرسال اجتماع {date_str} بنجاح")
+        
+    except Exception as e:
+        logger.error(f"send_daily_meeting: {e}")
+
 async def tasks_reminder(app):
     try:
         await app.bot.send_message(chat_id=GROUP_ID, text=(
@@ -87,13 +122,24 @@ async def daily_backup(app):
 def setup_scheduler(app):
     scheduler = AsyncIOScheduler(timezone=tz)
 
+    # فتح المجموعة - 11:00 صباحاً
     scheduler.add_job(open_group, CronTrigger(hour=OPEN_HOUR, minute=OPEN_MINUTE, timezone=tz), args=[app])
+    
+    # إغلاق المجموعة - 9:00 مساءً
     scheduler.add_job(close_group, CronTrigger(hour=CLOSE_HOUR, minute=CLOSE_MINUTE, timezone=tz), args=[app])
 
+    # تحذير قبل الإغلاق
     wh = CLOSE_HOUR if CLOSE_MINUTE - WARNING_MINUTES >= 0 else CLOSE_HOUR - 1
     wm = (CLOSE_MINUTE - WARNING_MINUTES) % 60
     scheduler.add_job(pre_close_warning, CronTrigger(hour=wh, minute=wm, timezone=tz), args=[app])
+    
+    # تذكير المهام - 2:00 ظهراً
     scheduler.add_job(tasks_reminder, CronTrigger(hour=14, minute=0, timezone=tz), args=[app])
+    
+    # إرسال الاجتماع اليومي - 10:00 مساءً (عدا الجمعة والسبت)
+    scheduler.add_job(send_daily_meeting, CronTrigger(hour=22, minute=0, timezone=tz), args=[app])
+    
+    # نسخة احتياطية - منتصف الليل
     scheduler.add_job(daily_backup, CronTrigger(hour=0, minute=0, timezone=tz), args=[app])
 
     scheduler.start()
