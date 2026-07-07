@@ -5,14 +5,13 @@ import asyncio
 import random
 from datetime import datetime
 from telegram import ChatPermissions
-from config import GROUP_ID, TIMEZONE, OPEN_HOUR, OPEN_MINUTE, CLOSE_HOUR, CLOSE_MINUTE, WARNING_MINUTES, ADMIN_IDS
+from config import GROUP_ID, GROUP_IDS, TIMEZONE, OPEN_HOUR, OPEN_MINUTE, CLOSE_HOUR, CLOSE_MINUTE, WARNING_MINUTES, ADMIN_IDS
 from database import db
 import logging
 
 logger = logging.getLogger(__name__)
 tz = pytz.timezone(TIMEZONE)
 
-# ===== رسائل تحفيزية عشوائية =====
 MOTIVATIONAL_MESSAGES = [
     "🌟 النجاح لا يأتي من الحظ، بل من العمل والالتزام اليومي.\n\nابدأ يومك بطاقة إيجابية وأنجز مهامك! 💙",
     "💪 كل يوم تلتزم فيه هو خطوة نحو هدفك.\n\nلا تتوقف، الفريق يحتاجك! 🌹",
@@ -26,84 +25,76 @@ MOTIVATIONAL_MESSAGES = [
     "🌙 نهاية كل يوم سؤال: هل أنجزت ما خططت له؟\n\nاجعل الإجابة دائماً: نعم! 💙",
 ]
 
-# ===== رسائل الختام الأسبوعي =====
 WEEKLY_CLOSING = [
     "🌟 ختام أسبوع مميز!\n\nشكراً لكل عضو التزم وعمل بجد هذا الأسبوع.\nكل خطوة قمت بها اقتربت من هدفك.\n\nاستعدوا لأسبوع جديد مليء بالنجاح! 💙\n\nإدارة TOP CASH",
     "💙 أسبوع مر وأنتم في تقدم مستمر!\n\nالالتزام هو مفتاح النجاح، واستمراركم دليل على عزيمتكم.\n\nنتمنى لكم نهاية أسبوع سعيدة وبداية جديدة موفقة! 🌹\n\nإدارة TOP CASH",
     "🎯 أسبوع من العمل والتعلم!\n\nلكل من التزم بمهامه وساعد فريقه، أنتم الفرق الحقيقي.\n\nاستريحوا وعودوا بطاقة مضاعفة! 💪\n\nإدارة TOP CASH",
 ]
 
-async def open_group(app):
-    try:
-        await app.bot.set_chat_permissions(
-            chat_id=GROUP_ID,
-            permissions=ChatPermissions(can_send_messages=True)
-        )
-        # رسالة تحفيزية عشوائية مع الفتح
-        motivational = random.choice(MOTIVATIONAL_MESSAGES)
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "🌞 صباح الخير أعضاء TOP CASH\n\n"
-                "تم فتح الدردشة لهذا اليوم.\n\n"
-                f"{motivational}\n\n"
-                "💙 إدارة TOP CASH"
+async def send_to_all(app, text):
+    """إرسال رسالة لكل المجموعات"""
+    for gid in GROUP_IDS:
+        try:
+            await app.bot.send_message(chat_id=gid, text=text)
+        except Exception as e:
+            logger.error(f"send_to_all error [{gid}]: {e}")
+
+async def open_all_groups(app):
+    """فتح كل المجموعات"""
+    for gid in GROUP_IDS:
+        try:
+            await app.bot.set_chat_permissions(
+                chat_id=gid,
+                permissions=ChatPermissions(can_send_messages=True)
             )
-        )
-        db.log_event("group_opened")
-    except Exception as e:
-        logger.error(f"open_group: {e}")
+        except Exception as e:
+            logger.error(f"open_group error [{gid}]: {e}")
+    motivational = random.choice(MOTIVATIONAL_MESSAGES)
+    await send_to_all(app,
+        "🌞 صباح الخير أعضاء TOP CASH\n\n"
+        "تم فتح الدردشة لهذا اليوم.\n\n"
+        f"{motivational}\n\n"
+        "💙 إدارة TOP CASH"
+    )
+    db.log_event("groups_opened")
 
 async def pre_close_warning(app):
-    try:
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                f"⏰ تنبيه\n\n"
-                f"سيتم إغلاق الدردشة بعد {WARNING_MINUTES} دقائق.\n\n"
-                f"إذا كان لديكم أي استفسار يرجى إرساله الآن.\n\n"
-                f"شكراً لكم. 💙"
-            )
-        )
-    except Exception as e:
-        logger.error(f"pre_close: {e}")
+    await send_to_all(app,
+        f"⏰ تنبيه\n\n"
+        f"سيتم إغلاق الدردشة بعد {WARNING_MINUTES} دقائق.\n\n"
+        f"إذا كان لديكم أي استفسار يرجى إرساله الآن.\n\n"
+        f"شكراً لكم. 💙"
+    )
 
-async def close_group(app):
-    try:
-        await app.bot.set_chat_permissions(
-            chat_id=GROUP_ID,
-            permissions=ChatPermissions(can_send_messages=False)
-        )
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "🌙 انتهى الدوام الرسمي لهذا اليوم.\n\n"
-                "تم إغلاق الدردشة، وسيتم فتحها غداً الساعة 11:00 صباحاً.\n\n"
-                "شاكرين تعاونكم.\n"
-                "نتمنى لكم مساءً سعيداً.\n\n"
-                "💙 إدارة TOP CASH"
+async def close_all_groups(app):
+    """إغلاق كل المجموعات"""
+    for gid in GROUP_IDS:
+        try:
+            await app.bot.set_chat_permissions(
+                chat_id=gid,
+                permissions=ChatPermissions(can_send_messages=False)
             )
-        )
-        db.log_event("group_closed")
-    except Exception as e:
-        logger.error(f"close_group: {e}")
+        except Exception as e:
+            logger.error(f"close_group error [{gid}]: {e}")
+    await send_to_all(app,
+        "🌙 انتهى الدوام الرسمي لهذا اليوم.\n\n"
+        "تم إغلاق الدردشة، وسيتم فتحها غداً الساعة 11:00 صباحاً.\n\n"
+        "شاكرين تعاونكم.\n"
+        "نتمنى لكم مساءً سعيداً.\n\n"
+        "💙 إدارة TOP CASH"
+    )
+    db.log_event("groups_closed")
 
 async def meeting_reminder(app):
-    try:
-        now = datetime.now(tz)
-        if now.weekday() in [4, 5]:
-            return
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "🔔 تذكير\n\n"
-                "سيبدأ الاجتماع اليومي الليلة الساعة 10:00 مساءً بتوقيت العراق.\n\n"
-                "نرجو من الجميع الحضور والاستعداد.\n\n"
-                "💙 إدارة TOP CASH"
-            )
-        )
-    except Exception as e:
-        logger.error(f"meeting_reminder: {e}")
+    now = datetime.now(tz)
+    if now.weekday() in [4, 5]:
+        return
+    await send_to_all(app,
+        "🔔 تذكير\n\n"
+        "سيبدأ الاجتماع اليومي الليلة الساعة 10:00 مساءً بتوقيت العراق.\n\n"
+        "نرجو من الجميع الحضور والاستعداد.\n\n"
+        "💙 إدارة TOP CASH"
+    )
 
 async def send_daily_meeting(app):
     try:
@@ -116,8 +107,13 @@ async def send_daily_meeting(app):
             logger.info(f"لا يوجد اجتماع لتاريخ {date_str}")
             return
         messages = MEETINGS[date_str]
+        logger.info(f"📢 إرسال اجتماع {date_str}")
         for i, msg in enumerate(messages):
-            await app.bot.send_message(chat_id=GROUP_ID, text=msg)
+            for gid in GROUP_IDS:
+                try:
+                    await app.bot.send_message(chat_id=gid, text=msg)
+                except Exception as e:
+                    logger.error(f"meeting error [{gid}]: {e}")
             if i < len(messages) - 1:
                 await asyncio.sleep(30)
         logger.info(f"✅ تم إرسال اجتماع {date_str}")
@@ -125,65 +121,40 @@ async def send_daily_meeting(app):
         logger.error(f"send_daily_meeting: {e}")
 
 async def tasks_reminder(app):
-    try:
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "📋 تذكير بالمهام اليومية\n\n"
-                "🔔 لا تنسوا إتمام مهامكم اليومية!\n\n"
-                "✅ تأكدوا من:\n"
-                "• إتمام جميع المهام المطلوبة.\n"
-                "• إرسال صور الإنجاز.\n"
-                "• متابعة آخر التحديثات.\n\n"
-                "💙 إدارة TOP CASH"
-            )
-        )
-    except Exception as e:
-        logger.error(f"tasks_reminder: {e}")
+    await send_to_all(app,
+        "📋 تذكير بالمهام اليومية\n\n"
+        "🔔 لا تنسوا إتمام مهامكم اليومية!\n\n"
+        "✅ تأكدوا من:\n"
+        "• إتمام جميع المهام المطلوبة.\n"
+        "• إرسال صور الإنجاز.\n"
+        "• متابعة آخر التحديثات.\n\n"
+        "💙 إدارة TOP CASH"
+    )
 
 async def weekly_closing(app):
-    """ختام أسبوعي كل خميس 8 مساءً"""
-    try:
-        msg = random.choice(WEEKLY_CLOSING)
-        await app.bot.send_message(chat_id=GROUP_ID, text=msg)
-    except Exception as e:
-        logger.error(f"weekly_closing: {e}")
+    msg = random.choice(WEEKLY_CLOSING)
+    await send_to_all(app, msg)
 
 async def friday_greeting(app):
-    """تهنئة جمعة مباركة"""
-    try:
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "🕌 جمعة مباركة على جميع أعضاء TOP CASH\n\n"
-                "تقبل الله منا ومنكم صالح الأعمال.\n\n"
-                "نتمنى لكم جمعة مباركة وإجازة سعيدة. 🌹\n\n"
-                "💙 إدارة TOP CASH"
-            )
-        )
-    except Exception as e:
-        logger.error(f"friday_greeting: {e}")
+    await send_to_all(app,
+        "🕌 جمعة مباركة على جميع أعضاء TOP CASH\n\n"
+        "تقبل الله منا ومنكم صالح الأعمال.\n\n"
+        "نتمنى لكم جمعة مباركة وإجازة سعيدة. 🌹\n\n"
+        "💙 إدارة TOP CASH"
+    )
 
 async def sunday_reminder(app):
-    """تذكير أسبوعي كل أحد"""
-    try:
-        await app.bot.send_message(
-            chat_id=GROUP_ID,
-            text=(
-                "🌟 أهلاً بكم في أسبوع جديد!\n\n"
-                "مع بداية كل أسبوع، ضع لنفسك هدفاً واضحاً:\n\n"
-                "🎯 كم عضواً ستضيف هذا الأسبوع؟\n"
-                "📋 هل ستلتزم بمهامك يومياً؟\n"
-                "💪 هل ستتابع فريقك وتدعمه؟\n\n"
-                "النجاح يبدأ بقرار، والقرار يبدأ الآن!\n\n"
-                "💙 إدارة TOP CASH"
-            )
-        )
-    except Exception as e:
-        logger.error(f"sunday_reminder: {e}")
+    await send_to_all(app,
+        "🌟 أهلاً بكم في أسبوع جديد!\n\n"
+        "مع بداية كل أسبوع، ضع لنفسك هدفاً واضحاً:\n\n"
+        "🎯 كم عضواً ستضيف هذا الأسبوع؟\n"
+        "📋 هل ستلتزم بمهامك يومياً؟\n"
+        "💪 هل ستتابع فريقك وتدعمه؟\n\n"
+        "النجاح يبدأ بقرار، والقرار يبدأ الآن!\n\n"
+        "💙 إدارة TOP CASH"
+    )
 
 async def daily_stats(app):
-    """إحصائيات يومية للأدمن"""
     try:
         stats = db.get_stats()
         msg = (
@@ -197,6 +168,31 @@ async def daily_stats(app):
             await app.bot.send_message(chat_id=admin_id, text=msg)
     except Exception as e:
         logger.error(f"daily_stats: {e}")
+
+async def send_tasks_report(app):
+    try:
+        from bot import tasks_photos
+        from datetime import date
+        today = date.today().isoformat()
+        members_done = tasks_photos.get(today, [])
+        if members_done:
+            names = "\n".join([f"✅ {m['name']}" for m in members_done])
+            msg = (
+                f"📸 تقرير المهام اليومية\n\n"
+                f"عدد من أرسل صور المهام: {len(members_done)}\n\n"
+                f"{names}\n\n"
+                f"💙 TOP CASH Bot"
+            )
+        else:
+            msg = (
+                f"📸 تقرير المهام اليومية\n\n"
+                f"⚠️ لم يرسل أي عضو صورة مهمة حتى الآن!\n\n"
+                f"💙 TOP CASH Bot"
+            )
+        for admin_id in ADMIN_IDS:
+            await app.bot.send_message(chat_id=admin_id, text=msg)
+    except Exception as e:
+        logger.error(f"send_tasks_report: {e}")
 
 async def daily_backup(app):
     try:
@@ -213,72 +209,20 @@ async def daily_backup(app):
 def setup_scheduler(app):
     scheduler = AsyncIOScheduler(timezone=tz)
 
-    # فتح المجموعة - 11:00 صباحاً
-    scheduler.add_job(open_group, CronTrigger(hour=OPEN_HOUR, minute=OPEN_MINUTE, timezone=tz), args=[app])
-
-    # إغلاق المجموعة - 9:00 مساءً
-    scheduler.add_job(close_group, CronTrigger(hour=CLOSE_HOUR, minute=CLOSE_MINUTE, timezone=tz), args=[app])
-
-    # تحذير قبل الإغلاق
+    scheduler.add_job(open_all_groups, CronTrigger(hour=OPEN_HOUR, minute=OPEN_MINUTE, timezone=tz), args=[app])
+    scheduler.add_job(close_all_groups, CronTrigger(hour=CLOSE_HOUR, minute=CLOSE_MINUTE, timezone=tz), args=[app])
     wh = CLOSE_HOUR if CLOSE_MINUTE - WARNING_MINUTES >= 0 else CLOSE_HOUR - 1
     wm = (CLOSE_MINUTE - WARNING_MINUTES) % 60
     scheduler.add_job(pre_close_warning, CronTrigger(hour=wh, minute=wm, timezone=tz), args=[app])
-
-    # تذكير المهام - 2:00 ظهراً
     scheduler.add_job(tasks_reminder, CronTrigger(hour=14, minute=0, timezone=tz), args=[app])
-
-    # تذكير الاجتماع - 3:00 ظهراً (عدا الجمعة والسبت)
     scheduler.add_job(meeting_reminder, CronTrigger(hour=15, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
-
-    # إرسال الاجتماع - 10:00 مساءً (عدا الجمعة والسبت)
     scheduler.add_job(send_daily_meeting, CronTrigger(hour=22, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
-
-    # ختام أسبوعي - الخميس 8:00 مساءً
     scheduler.add_job(weekly_closing, CronTrigger(hour=20, minute=0, day_of_week='4', timezone=tz), args=[app])
-
-    # تهنئة الجمعة - 10:00 صباحاً
     scheduler.add_job(friday_greeting, CronTrigger(hour=10, minute=0, day_of_week='5', timezone=tz), args=[app])
-
-    # تذكير أسبوعي - الأحد 11:30 صباحاً
     scheduler.add_job(sunday_reminder, CronTrigger(hour=11, minute=30, day_of_week='0', timezone=tz), args=[app])
-
-    # إحصائيات يومية للأدمن - 9:30 مساءً
     scheduler.add_job(daily_stats, CronTrigger(hour=21, minute=30, timezone=tz), args=[app])
-
-    # نسخة احتياطية - منتصف الليل
+    scheduler.add_job(send_tasks_report, CronTrigger(hour=21, minute=0, timezone=tz), args=[app])
     scheduler.add_job(daily_backup, CronTrigger(hour=0, minute=0, timezone=tz), args=[app])
 
-    # تقرير المهام اليومية - 8:30 مساءً
-    scheduler.add_job(send_tasks_report, CronTrigger(hour=21, minute=0, timezone=tz), args=[app])
-
     scheduler.start()
-    logger.info("✅ Scheduler started")
-
-async def send_tasks_report(app):
-    """تقرير يومي لصور المهام - 8:30 مساءً"""
-    try:
-        from bot import tasks_photos
-        from datetime import date
-        today = date.today().isoformat()
-        members_done = tasks_photos.get(today, [])
-
-        if members_done:
-            names = "\n".join([f"✅ {m['name']}" for m in members_done])
-            msg = (
-                f"📸 تقرير المهام اليومية\n\n"
-                f"عدد من أرسل صور المهام: {len(members_done)}\n\n"
-                f"{names}\n\n"
-                f"💙 TOP CASH Bot"
-            )
-        else:
-            msg = (
-                f"📸 تقرير المهام اليومية\n\n"
-                f"⚠️ لم يرسل أي عضو صورة مهمة حتى الآن!\n\n"
-                f"💙 TOP CASH Bot"
-            )
-
-        for admin_id in ADMIN_IDS:
-            await app.bot.send_message(chat_id=admin_id, text=msg)
-
-    except Exception as e:
-        logger.error(f"send_tasks_report: {e}")
+    logger.info(f"✅ Scheduler started - {len(GROUP_IDS)} مجموعات")
