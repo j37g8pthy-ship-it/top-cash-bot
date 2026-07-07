@@ -248,5 +248,37 @@ def setup_scheduler(app):
     # نسخة احتياطية - منتصف الليل
     scheduler.add_job(daily_backup, CronTrigger(hour=0, minute=0, timezone=tz), args=[app])
 
+    # تقرير المهام اليومية - 8:30 مساءً
+    scheduler.add_job(send_tasks_report, CronTrigger(hour=21, minute=0, timezone=tz), args=[app])
+
     scheduler.start()
     logger.info("✅ Scheduler started")
+
+async def send_tasks_report(app):
+    """تقرير يومي لصور المهام - 8:30 مساءً"""
+    try:
+        from bot import tasks_photos
+        from datetime import date
+        today = date.today().isoformat()
+        members_done = tasks_photos.get(today, [])
+
+        if members_done:
+            names = "\n".join([f"✅ {m['name']}" for m in members_done])
+            msg = (
+                f"📸 تقرير المهام اليومية\n\n"
+                f"عدد من أرسل صور المهام: {len(members_done)}\n\n"
+                f"{names}\n\n"
+                f"💙 TOP CASH Bot"
+            )
+        else:
+            msg = (
+                f"📸 تقرير المهام اليومية\n\n"
+                f"⚠️ لم يرسل أي عضو صورة مهمة حتى الآن!\n\n"
+                f"💙 TOP CASH Bot"
+            )
+
+        for admin_id in ADMIN_IDS:
+            await app.bot.send_message(chat_id=admin_id, text=msg)
+
+    except Exception as e:
+        logger.error(f"send_tasks_report: {e}")
