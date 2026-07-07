@@ -144,15 +144,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = "\n\n".join(knowledge)
         for admin_id in ADMIN_IDS:
             try:
+                # رسالة 1: السؤال
                 await context.bot.send_message(
                     chat_id=admin_id,
                     text=(
                         f"❓ سؤال من عضو\n\n"
                         f"👤 الاسم: {user.first_name}\n"
-                        f"💬 السؤال: {text}\n\n"
-                        f"📌 الجواب:\n{answer}\n\n"
-                        f"انسخ الجواب وأرسله في المجموعة 💙"
+                        f"💬 {text}"
                     )
+                )
+                # رسالة 2: الجواب كامل
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"{answer}\n\n📋 انسخ وأرسل في المجموعة 💙"
                 )
             except Exception as e:
                 logger.error(f"answer notify: {e}")
@@ -166,8 +170,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"❓ سؤال بدون إجابة\n\n"
                         f"👤 الاسم: {user.first_name}\n"
                         f"🆔 ID: {user_id}\n"
-                        f"💬 السؤال: {text}\n\n"
-                        f"⚠️ لا يوجد جواب في قاعدة البيانات"
+                        f"💬 {text}\n\n"
+                        f"⚠️ لا يوجد جواب - أضف الإجابة لاحقاً"
                     )
                 )
             except Exception as e:
