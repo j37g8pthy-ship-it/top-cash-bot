@@ -156,7 +156,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # رسالة 2: الجواب كامل
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"{answer}\n\n📋 انسخ وأرسل في المجموعة 💙"
+                    text=answer
                 )
             except Exception as e:
                 logger.error(f"answer notify: {e}")
