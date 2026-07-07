@@ -28,6 +28,9 @@ AD_KEYWORDS = [
 # ===== تتبع التحذيرات =====
 warnings_count = {}
 
+# ===== تتبع صور المهام =====
+tasks_photos = {}
+
 # ===== ترحيب بالأعضاء الجدد =====
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
@@ -75,11 +78,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     user_id = user.id
 
-    # تجاهل رسائل الأدمن
     if user_id in ADMIN_IDS:
         return
 
-    # ===== فلترة الروابط والإعلانات =====
+    # فلترة الروابط والإعلانات
     has_link = bool(LINK_PATTERN.search(text))
     has_ad = any(kw in text for kw in AD_KEYWORDS)
 
@@ -94,19 +96,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if count == 1:
             await context.bot.send_message(
-                chat_id=GROUP_ID,
+                chat_id=msg.chat_id,
                 text=f"⚠️ تحذير أول لـ {user.first_name}\nإرسال الروابط والإعلانات ممنوع."
             )
         elif count == 2:
             await context.bot.send_message(
-                chat_id=GROUP_ID,
+                chat_id=msg.chat_id,
                 text=f"⚠️ تحذير ثاني وأخير لـ {user.first_name}\nالمرة القادمة سيتم حظرك."
             )
         elif count >= 3:
             try:
-                await context.bot.ban_chat_member(chat_id=GROUP_ID, user_id=user_id)
+                await context.bot.ban_chat_member(chat_id=msg.chat_id, user_id=user_id)
                 await context.bot.send_message(
-                    chat_id=GROUP_ID,
+                    chat_id=msg.chat_id,
                     text=f"🚫 تم حظر {user.first_name} بسبب مخالفة القوانين."
                 )
                 for admin_id in ADMIN_IDS:
@@ -118,7 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # ===== فحص كلمات التهنئة =====
+    # فحص كلمات التهنئة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         for admin_id in ADMIN_IDS:
@@ -137,14 +139,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"congrats notify: {e}")
         return
 
-    # ===== البحث عن إجابة وإرسالها للأدمن =====
+    # البحث عن إجابة وإرسالها للأدمن
     knowledge = db.search_knowledge(text)
 
     if knowledge:
         answer = "\n\n".join(knowledge)
         for admin_id in ADMIN_IDS:
             try:
-                # رسالة 1: السؤال
                 await context.bot.send_message(
                     chat_id=admin_id,
                     text=(
@@ -153,15 +154,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"💬 {text}"
                     )
                 )
-                # رسالة 2: الجواب كامل
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"{answer}\n\n📋 انسخ وأرسل في المجموعة 💙"
+                    text=answer
                 )
             except Exception as e:
                 logger.error(f"answer notify: {e}")
     else:
-        # ما في إجابة
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -171,14 +170,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"👤 الاسم: {user.first_name}\n"
                         f"🆔 ID: {user_id}\n"
                         f"💬 {text}\n\n"
-                        f"⚠️ لا يوجد جواب - أضف الإجابة لاحقاً"
+                        f"⚠️ لا يوجد جواب في قاعدة البيانات"
                     )
                 )
             except Exception as e:
                 logger.error(f"unknown notify: {e}")
-
-# ===== تتبع صور المهام اليومية =====
-tasks_photos = {}  # {date: [{name, user_id}]}
 
 # ===== معالجة الصور =====
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -208,12 +204,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"photo notify: {e}")
     else:
-        # صورة مهمة - تتبع
         from datetime import date
         today = date.today().isoformat()
         if today not in tasks_photos:
             tasks_photos[today] = []
-        # تجنب التكرار
         ids = [x["id"] for x in tasks_photos[today]]
         if user.id not in ids:
             tasks_photos[today].append({
@@ -245,14 +239,18 @@ async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         return
     try:
-        count = await context.bot.get_chat_member_count(chat_id=GROUP_ID)
+        msg = "📊 إحصائيات المجموعات\n\n"
+        for gid in GROUP_IDS:
+            try:
+                count = await context.bot.get_chat_member_count(chat_id=gid)
+                chat = await context.bot.get_chat(chat_id=gid)
+                msg += f"👥 {chat.title}: {count} عضو\n"
+            except Exception:
+                msg += f"❌ مجموعة {gid}: خطأ\n"
         stats = db.get_stats()
-        await update.message.reply_text(
-            f"📊 إحصائيات المجموعة\n\n"
-            f"👥 إجمالي الأعضاء: {count}\n"
-            f"💬 أسئلة اليوم: {stats['questions_today']}\n"
-            f"❓ أسئلة بدون إجابة: {stats['unanswered']}"
-        )
+        msg += f"\n💬 أسئلة اليوم: {stats['questions_today']}\n"
+        msg += f"❓ بدون إجابة: {stats['unanswered']}"
+        await update.message.reply_text(msg)
     except Exception as e:
         await update.message.reply_text(f"❌ خطأ: {e}")
 
@@ -277,7 +275,7 @@ def main():
 
     setup_scheduler(app)
 
-    logger.info("🚀 TOP CASH Bot Started!")
+    logger.info(f"🚀 TOP CASH Bot Started! - {len(GROUP_IDS)} مجموعات")
     app.run_polling(
         drop_pending_updates=True,
         allowed_updates=Update.ALL_TYPES,
