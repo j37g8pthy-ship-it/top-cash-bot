@@ -18,11 +18,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ===== فلترة الروابط =====
-LINK_PATTERN = re.compile(r'(https?://|t\.me/|@\w+|www\.)', re.IGNORECASE)
+LINK_PATTERN = re.compile(r'(https?://|t\.me/|www\.)', re.IGNORECASE)
 AD_KEYWORDS = [
     "ربح مضمون", "استثمار مضمون", "انضم الآن", "اشترك الآن",
-    "تواصل معي", "للتواصل", "واتساب", "whatsapp", "telegram",
-    "قناة", "منصة أخرى", "فرصة ذهبية", "ربح سريع",
+    "تواصل معي", "للتواصل", "واتساب", "whatsapp",
+    "منصة أخرى", "فرصة ذهبية", "ربح سريع",
 ]
 
 # ===== تتبع التحذيرات =====
@@ -41,7 +41,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"نتمنى لك تجربة ناجحة ومربحة 💙\n"
             f"إدارة TOP CASH"
         )
-        # إشعار الأدمن
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -90,14 +89,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-        # تتبع التحذيرات
         warnings_count[user_id] = warnings_count.get(user_id, 0) + 1
         count = warnings_count[user_id]
 
         if count == 1:
             await context.bot.send_message(
                 chat_id=GROUP_ID,
-                text=f"⚠️ تحذير أول لـ {user.first_name}\nإرسال الروابط والإعلانات ممنوع في هذه المجموعة."
+                text=f"⚠️ تحذير أول لـ {user.first_name}\nإرسال الروابط والإعلانات ممنوع."
             )
         elif count == 2:
             await context.bot.send_message(
@@ -111,7 +109,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=GROUP_ID,
                     text=f"🚫 تم حظر {user.first_name} بسبب مخالفة القوانين."
                 )
-                # إشعار الأدمن
                 for admin_id in ADMIN_IDS:
                     await context.bot.send_message(
                         chat_id=admin_id,
@@ -140,20 +137,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"congrats notify: {e}")
         return
 
-    # ===== أي سؤال → أرسل للأدمن =====
-    for admin_id in ADMIN_IDS:
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=(
-                    f"❓ رسالة في المجموعة\n\n"
-                    f"👤 الاسم: {user.first_name}\n"
-                    f"🆔 ID: {user_id}\n"
-                    f"💬 الرسالة: {text}"
+    # ===== البحث عن إجابة وإرسالها للأدمن =====
+    knowledge = db.search_knowledge(text)
+
+    if knowledge:
+        answer = "\n\n".join(knowledge)
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=(
+                        f"❓ سؤال من عضو\n\n"
+                        f"👤 الاسم: {user.first_name}\n"
+                        f"💬 السؤال: {text}\n\n"
+                        f"📌 الجواب:\n{answer}\n\n"
+                        f"انسخ الجواب وأرسله في المجموعة 💙"
+                    )
                 )
-            )
-        except Exception as e:
-            logger.error(f"question notify: {e}")
+            except Exception as e:
+                logger.error(f"answer notify: {e}")
+    else:
+        # ما في إجابة
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=(
+                        f"❓ سؤال بدون إجابة\n\n"
+                        f"👤 الاسم: {user.first_name}\n"
+                        f"🆔 ID: {user_id}\n"
+                        f"💬 السؤال: {text}\n\n"
+                        f"⚠️ لا يوجد جواب في قاعدة البيانات"
+                    )
+                )
+            except Exception as e:
+                logger.error(f"unknown notify: {e}")
 
 # ===== معالجة الصور =====
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
