@@ -2,7 +2,7 @@ import logging
 import re
 from telegram import Update, ChatPermissions
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
-from config import BOT_TOKEN, ADMIN_IDS, GROUP_ID
+from config import BOT_TOKEN, ADMIN_IDS, GROUP_ID, GROUP_IDS
 from database import db
 from scheduler import setup_scheduler
 from knowledge_base import init_knowledge
@@ -156,7 +156,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # رسالة 2: الجواب كامل
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=answer
+                    text=f"{answer}\n\n📋 انسخ وأرسل في المجموعة 💙"
                 )
             except Exception as e:
                 logger.error(f"answer notify: {e}")
@@ -176,6 +176,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.error(f"unknown notify: {e}")
+
+# ===== تتبع صور المهام اليومية =====
+tasks_photos = {}  # {date: [{name, user_id}]}
 
 # ===== معالجة الصور =====
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,6 +207,21 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.error(f"photo notify: {e}")
+    else:
+        # صورة مهمة - تتبع
+        from datetime import date
+        today = date.today().isoformat()
+        if today not in tasks_photos:
+            tasks_photos[today] = []
+        # تجنب التكرار
+        ids = [x["id"] for x in tasks_photos[today]]
+        if user.id not in ids:
+            tasks_photos[today].append({
+                "id": user.id,
+                "name": user.first_name,
+                "username": user.username or ""
+            })
+        logger.info(f"📸 صورة مهمة من {user.first_name}")
 
 # ===== أمر /broadcast للأدمن =====
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -213,11 +231,14 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الاستخدام: /broadcast الرسالة")
         return
     text = " ".join(context.args)
-    try:
-        await context.bot.send_message(chat_id=GROUP_ID, text=text)
-        await update.message.reply_text("✅ تم إرسال الرسالة للمجموعة")
-    except Exception as e:
-        await update.message.reply_text(f"❌ خطأ: {e}")
+    success = 0
+    for gid in GROUP_IDS:
+        try:
+            await context.bot.send_message(chat_id=gid, text=text)
+            success += 1
+        except Exception as e:
+            logger.error(f"broadcast error [{gid}]: {e}")
+    await update.message.reply_text(f"✅ تم الإرسال لـ {success}/{len(GROUP_IDS)} مجموعة")
 
 # ===== أمر /members للأدمن =====
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
