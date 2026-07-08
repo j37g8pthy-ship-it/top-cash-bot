@@ -107,7 +107,12 @@ class Database:
             rows = c.execute("SELECT id, question, answer, hits FROM knowledge").fetchall()
 
             scored = []
-            query_words = [w for w in query.split() if len(w) > 2]
+            # نستخدم فقط الكلمات الأطول من 3 حروف لتجنب الخلط
+            query_words = [w for w in query.split() if len(w) > 3]
+
+            # إذا ما في كلمات كافية نرجع فارغ
+            if not query_words:
+                return []
 
             for row in rows:
                 score = 0
@@ -117,9 +122,9 @@ class Database:
                     w = word.lower()
                     if w in q:
                         score += 10
-                    elif len(w) >= 4 and w[:4] in q:
+                    elif len(w) >= 5 and w[:5] in q:
                         score += 5
-                    elif len(w) >= 3 and w[:3] in q:
+                    elif len(w) >= 4 and w[:4] in q:
                         score += 3
 
                 if score > 0:
@@ -130,6 +135,10 @@ class Database:
 
             scored.sort(reverse=True)
             best_score = scored[0][0]
+
+            # نرجع نتيجة فقط إذا الـ score كافي (على الأقل 10)
+            if best_score < 10:
+                return []
 
             results = []
             for score, rid, answer in scored:
