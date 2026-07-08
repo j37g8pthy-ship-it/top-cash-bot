@@ -17,7 +17,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ===== فلترة الروابط =====
 LINK_PATTERN = re.compile(r'(https?://|t\.me/|www\.)', re.IGNORECASE)
 AD_KEYWORDS = [
     "ربح مضمون", "استثمار مضمون", "انضم الآن", "اشترك الآن",
@@ -25,13 +24,9 @@ AD_KEYWORDS = [
     "منصة أخرى", "فرصة ذهبية", "ربح سريع",
 ]
 
-# ===== تتبع التحذيرات =====
 warnings_count = {}
-
-# ===== تتبع صور المهام =====
 tasks_photos = {}
 
-# ===== ترحيب بالأعضاء الجدد =====
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         if member.is_bot:
@@ -59,7 +54,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"welcome notify: {e}")
         db.log_event("new_member", {"user_id": member.id})
 
-# ===== كلمات التهنئة =====
 CONGRATS_KEYWORDS = [
     "تم السحب", "وصل السحب", "وصلت الفلوس", "وصل المبلغ",
     "استلمت", "وصلت ارباحي", "وصل الراتب", "وصل ربحي",
@@ -68,7 +62,6 @@ CONGRATS_KEYWORDS = [
     "شكرا top cash", "شكرا للشركة", "شكرا للادارة",
 ]
 
-# ===== معالجة الرسائل =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text or not msg.from_user:
@@ -120,23 +113,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # فحص كلمات التهنئة
+    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=(
-                        f"🎉 تهنئة سحب!\n\n"
-                        f"👤 الاسم: {user.first_name}\n"
-                        f"🆔 ID: {user_id}\n"
-                        f"💬 الرسالة: {text}\n\n"
-                        f"انسخ التهنئة وأرسلها في المجموعة 💙"
-                    )
-                )
-            except Exception as e:
-                logger.error(f"congrats notify: {e}")
+        await msg.reply_text(
+            "مبروك على وصول السحب 🎉\n\n"
+            "كل سحب هو ثمرة التزامك وعملك الجاد 💪\n"
+            "نفخر بكل عضو ملتزم في عائلة TOP CASH 🌹\n\n"
+            "💙 إدارة TOP CASH"
+        )
         return
 
     # البحث عن إجابة وإرسالها للأدمن
@@ -176,7 +161,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"unknown notify: {e}")
 
-# ===== معالجة الصور =====
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.photo:
@@ -189,20 +173,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_congrats = any(kw in caption.lower() for kw in CONGRATS_KEYWORDS)
 
     if is_congrats:
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=(
-                        f"🎉 صورة سحب!\n\n"
-                        f"👤 {user.first_name}\n"
-                        f"🆔 {user.id}\n"
-                        f"💬 {caption}\n\n"
-                        f"انسخ التهنئة وأرسلها في المجموعة 💙"
-                    )
-                )
-            except Exception as e:
-                logger.error(f"photo notify: {e}")
+        await msg.reply_text(
+            "مبروك على وصول السحب 🎉\n\n"
+            "كل سحب هو ثمرة التزامك وعملك الجاد 💪\n"
+            "نفخر بكل عضو ملتزم في عائلة TOP CASH 🌹\n\n"
+            "💙 إدارة TOP CASH"
+        )
     else:
         from datetime import date
         today = date.today().isoformat()
@@ -217,7 +193,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             })
         logger.info(f"📸 صورة مهمة من {user.first_name}")
 
-# ===== أمر /broadcast للأدمن =====
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         return
@@ -234,7 +209,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"broadcast error [{gid}]: {e}")
     await update.message.reply_text(f"✅ تم الإرسال لـ {success}/{len(GROUP_IDS)} مجموعة")
 
-# ===== أمر /members للأدمن =====
 async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         return
@@ -254,13 +228,11 @@ async def members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ خطأ: {e}")
 
-# ===== معالجة الأخطاء =====
 async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
     error = str(context.error)
     logger.error(f"❌ Error: {error}")
     db.log_error(error)
 
-# ===== تشغيل البوت =====
 def main():
     init_knowledge()
 
