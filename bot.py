@@ -25,7 +25,6 @@ AD_KEYWORDS = [
 ]
 
 warnings_count = {}
-tasks_photos = {}
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
@@ -113,7 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
+    # فحص كلمات التهنئة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -180,17 +179,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💙 إدارة TOP CASH"
         )
     else:
-        from datetime import date
-        today = date.today().isoformat()
-        if today not in tasks_photos:
-            tasks_photos[today] = []
-        ids = [x["id"] for x in tasks_photos[today]]
-        if user.id not in ids:
-            tasks_photos[today].append({
-                "id": user.id,
-                "name": user.first_name,
-                "username": user.username or ""
-            })
+        # حفظ صورة المهمة في قاعدة البيانات
+        db.log_task_photo(user.id, user.first_name, user.username or "")
         logger.info(f"📸 صورة مهمة من {user.first_name}")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
