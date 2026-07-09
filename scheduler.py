@@ -19,7 +19,7 @@ MOTIVATIONAL_MESSAGES = [
     "⭐ أصغر خطوة تقوم بها اليوم تصنع فرقاً كبيراً في الغد.\n\nأنجز مهامك الآن! 🌟",
     "🚀 الالتزام اليومي هو سر بناء الفريق الناجح.\n\nتذكر: فريقك يراقبك ويتعلم منك! 💙",
     "💡 من يعمل في صمت اليوم، يتحدث بنجاحه غداً.\n\nواصل العمل! 🌹",
-    "🌈 كل عضو تدعوه اليوم قد يكون قائد الغد.\n\nلا تضيع الفرصة! 💙",
+    "💫 كل عضو تدعوه اليوم قد يكون قائد الغد.\n\nلا تضيع الفرصة! 💙",
     "🔥 الحماس يبدأ... لكن الالتزام هو الذي يصل.\n\nكن من الملتزمين! 💪",
     "💎 قيمتك تزداد كلما زاد التزامك وفريقك.\n\nاستثمر في نفسك كل يوم! 🌟",
     "🌙 نهاية كل يوم سؤال: هل أنجزت ما خططت له؟\n\nاجعل الإجابة دائماً: نعم! 💙",
@@ -32,7 +32,6 @@ WEEKLY_CLOSING = [
 ]
 
 async def send_to_all(app, text):
-    """إرسال رسالة لكل المجموعات"""
     for gid in GROUP_IDS:
         try:
             await app.bot.send_message(chat_id=gid, text=text)
@@ -40,12 +39,20 @@ async def send_to_all(app, text):
             logger.error(f"send_to_all error [{gid}]: {e}")
 
 async def open_all_groups(app):
-    """فتح كل المجموعات"""
     for gid in GROUP_IDS:
         try:
             await app.bot.set_chat_permissions(
                 chat_id=gid,
-                permissions=ChatPermissions(can_send_messages=True)
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_photos=True,
+                    can_send_videos=True,
+                    can_send_documents=True,
+                    can_send_voice_notes=True,
+                    can_send_video_notes=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                )
             )
         except Exception as e:
             logger.error(f"open_group error [{gid}]: {e}")
@@ -67,12 +74,20 @@ async def pre_close_warning(app):
     )
 
 async def close_all_groups(app):
-    """إغلاق كل المجموعات"""
     for gid in GROUP_IDS:
         try:
             await app.bot.set_chat_permissions(
                 chat_id=gid,
-                permissions=ChatPermissions(can_send_messages=False)
+                permissions=ChatPermissions(
+                    can_send_messages=False,
+                    can_send_photos=False,
+                    can_send_videos=False,
+                    can_send_documents=False,
+                    can_send_voice_notes=False,
+                    can_send_video_notes=False,
+                    can_send_other_messages=False,
+                    can_add_web_page_previews=False,
+                )
             )
         except Exception as e:
             logger.error(f"close_group error [{gid}]: {e}")
@@ -107,7 +122,6 @@ async def send_daily_meeting(app):
             logger.info(f"لا يوجد اجتماع لتاريخ {date_str}")
             return
         messages = MEETINGS[date_str]
-        logger.info(f"📢 إرسال اجتماع {date_str}")
         for i, msg in enumerate(messages):
             for gid in GROUP_IDS:
                 try:
@@ -171,12 +185,9 @@ async def daily_stats(app):
 
 async def send_tasks_report(app):
     try:
-        from bot import tasks_photos
-        from datetime import date
-        today = date.today().isoformat()
-        members_done = tasks_photos.get(today, [])
+        members_done = db.get_task_photos()
         if members_done:
-            names = "\n".join([f"✅ {m['name']}" for m in members_done])
+            names = "\n".join([f"✅ {name}" for name in members_done])
             msg = (
                 f"📸 تقرير المهام اليومية\n\n"
                 f"عدد من أرسل صور المهام: {len(members_done)}\n\n"
