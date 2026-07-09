@@ -85,6 +85,14 @@ class Database:
                     msg_text TEXT,
                     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS task_photos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    name TEXT,
+                    username TEXT,
+                    date TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
             """)
         logger.info("✅ Database ready")
 
@@ -102,22 +110,15 @@ class Database:
             c.execute("DELETE FROM knowledge WHERE id=?", (kid,))
 
     def search_knowledge(self, query: str, limit: int = 1) -> list:
-        """بحث ذكي - يلقى أدق إجابة"""
         with self._conn() as c:
             rows = c.execute("SELECT id, question, answer, hits FROM knowledge").fetchall()
-
             scored = []
-            # نستخدم فقط الكلمات الأطول من 3 حروف لتجنب الخلط
             query_words = [w for w in query.split() if len(w) > 3]
-
-            # إذا ما في كلمات كافية نرجع فارغ
             if not query_words:
                 return []
-
             for row in rows:
                 score = 0
                 q = row["question"].lower()
-
                 for word in query_words:
                     w = word.lower()
                     if w in q:
@@ -126,26 +127,19 @@ class Database:
                         score += 5
                     elif len(w) >= 4 and w[:4] in q:
                         score += 3
-
                 if score > 0:
                     scored.append((score, row["id"], row["answer"]))
-
             if not scored:
                 return []
-
             scored.sort(reverse=True)
             best_score = scored[0][0]
-
-            # نرجع نتيجة فقط إذا الـ score كافي (على الأقل 10)
             if best_score < 10:
                 return []
-
             results = []
             for score, rid, answer in scored:
                 if score == best_score:
                     results.append(answer)
                     c.execute("UPDATE knowledge SET hits=hits+1 WHERE id=?", (rid,))
-
             return results[:limit]
 
     def get_all_knowledge(self) -> list:
@@ -248,6 +242,31 @@ class Database:
                                AND sent_at > datetime('now', ? || ' seconds')""",
                             (user_id, text, f"-{window}")).fetchone()
             return row["cnt"] if row else 0
+
+    def log_task_photo(self, user_id: int, name: str, username: str = ""):
+        """تسجيل صورة مهمة في قاعدة البيانات"""
+        today = date.today().isoformat()
+        with self._conn() as c:
+            exists = c.execute(
+                "SELECT 1 FROM task_photos WHERE user_id=? AND date=?",
+                (user_id, today)
+            ).fetchone()
+            if not exists:
+                c.execute(
+                    "INSERT INTO task_photos (user_id, name, username, date) VALUES (?,?,?,?)",
+                    (user_id, name, username, today)
+                )
+
+    def get_task_photos(self, date_str: str = None) -> list:
+        """جلب أسماء من أرسل صور المهام"""
+        if not date_str:
+            date_str = date.today().isoformat()
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT name FROM task_photos WHERE date=?",
+                (date_str,)
+            ).fetchall()
+            return [r["name"] for r in rows]
 
     def get_stats(self) -> dict:
         today = date.today().isoformat()
