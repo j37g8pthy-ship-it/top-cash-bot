@@ -59,6 +59,18 @@ CONGRATS_KEYWORDS = [
     "وصل المكسب", "استلمت السحب", "وصلت المبلغ",
     "تم استلام", "وصل التحويل", "شكرا توب كاش",
     "شكرا top cash", "شكرا للشركة", "شكرا للادارة",
+    "تم استلامه", "شكراً للإدارة", "شكرا الادارة",
+    "وصل مبلغي", "استلمته", "استلمت مبلغي",
+    "سحب ناجح", "تم بنجاح", "الف شكر", "الف مبروك",
+    "وصلت الاموال", "استلمت الفلوس", "وصل حسابي",
+    "شكرا لكم", "شكراً لكم", "الشكر للادارة", "الشكر للإدارة",
+    "وصلني السحب", "وصل الحوالة", "تم التحويل",
+    "استلمت المبلغ", "الحمد لله وصل", "الحمدلله وصل",
+    "مشكورين", "يسلمو", "تسلمون", "الله يبارك",
+    "شكرا توب", "شكرا TOP", "TOP CASH شكرا",
+    "وصلي الفلوس", "اجاني المبلغ", "اجاني السحب",
+    "المبلغ وصل", "الفلوس وصلت", "الراتب وصل",
+    "احترافي شكرا", "منصة رائعة", "منصة ممتازة",
 ]
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,7 +85,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMIN_IDS:
         return
 
-    # فلترة الروابط والإعلانات
     has_link = bool(LINK_PATTERN.search(text))
     has_ad = any(kw in text for kw in AD_KEYWORDS)
 
@@ -112,7 +123,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # فحص كلمات التهنئة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -123,7 +133,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # البحث عن إجابة وإرسالها للأدمن
     knowledge = db.search_knowledge(text)
 
     if knowledge:
@@ -179,7 +188,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💙 إدارة TOP CASH"
         )
     else:
-        # حفظ صورة المهمة في قاعدة البيانات
         db.log_task_photo(user.id, user.first_name, user.username or "")
         logger.info(f"📸 صورة مهمة من {user.first_name}")
 
