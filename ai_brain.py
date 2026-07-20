@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # مفتاح Claude API من Railway Variables
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
-CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
+CLAUDE_MODEL = "claude-sonnet-4-5"
 
 # ردود سريعة
 FAST_RESPONSES = {
