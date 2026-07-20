@@ -6,6 +6,7 @@ from config import BOT_TOKEN, ADMIN_IDS, GROUP_ID, GROUP_IDS
 from database import db
 from scheduler import setup_scheduler
 from knowledge_base import init_knowledge
+from ai_brain import get_ai_response, set_app
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -85,6 +86,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMIN_IDS:
         return
 
+    # فلترة الروابط والإعلانات
     has_link = bool(LINK_PATTERN.search(text))
     has_ad = any(kw in text for kw in AD_KEYWORDS)
 
@@ -123,6 +125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
+    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -133,41 +136,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    knowledge = db.search_knowledge(text)
+    # الحصول على الرد من ai_brain (قاعدة المعرفة + Claude AI)
+    try:
+        answer, source = await get_ai_response(text, user_id)
 
-    if knowledge:
-        answer = "\n\n".join(knowledge)
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=(
-                        f"❓ سؤال من عضو\n\n"
-                        f"👤 الاسم: {user.first_name}\n"
-                        f"💬 {text}"
+        # نرد على العضو في المجموعة إذا كان الرد من knowledge أو claude
+        if source in ["knowledge", "claude", "fast", "cache"]:
+            await msg.reply_text(answer)
+            logger.info(f"✅ رد [{source}] لـ {user.first_name}")
+
+            # نرسل نسخة للأدمن للاطلاع
+            for admin_id in ADMIN_IDS:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=(
+                            f"❓ سؤال من عضو [{source}]\n\n"
+                            f"👤 الاسم: {user.first_name}\n"
+                            f"💬 {text}\n\n"
+                            f"📌 تم الرد تلقائياً في المجموعة"
+                        )
                     )
-                )
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=answer
-                )
-            except Exception as e:
-                logger.error(f"answer notify: {e}")
-    else:
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=(
-                        f"❓ سؤال بدون إجابة\n\n"
-                        f"👤 الاسم: {user.first_name}\n"
-                        f"🆔 ID: {user_id}\n"
-                        f"💬 {text}\n\n"
-                        f"⚠️ لا يوجد جواب في قاعدة البيانات"
+                except Exception as e:
+                    logger.error(f"admin notify: {e}")
+        else:
+            # unknown - نرسل للأدمن فقط
+            for admin_id in ADMIN_IDS:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=(
+                            f"❓ سؤال بدون إجابة\n\n"
+                            f"👤 الاسم: {user.first_name}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"💬 {text}\n\n"
+                            f"⚠️ لا يوجد جواب في قاعدة البيانات"
+                        )
                     )
-                )
-            except Exception as e:
-                logger.error(f"unknown notify: {e}")
+                except Exception as e:
+                    logger.error(f"unknown notify: {e}")
+    except Exception as e:
+        logger.error(f"handle_message error: {e}")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -235,6 +244,9 @@ def main():
     init_knowledge()
 
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # تعيين app في ai_brain للسماح بإرسال رسائل للأدمن
+    set_app(app)
 
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("members", members))
