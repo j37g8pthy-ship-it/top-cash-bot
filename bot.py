@@ -25,6 +25,19 @@ AD_KEYWORDS = [
     "منصة أخرى", "فرصة ذهبية", "ربح سريع",
 ]
 
+# كلمات الاستفهام - البوت يرد فقط إذا الرسالة تحتوي واحدة منها
+QUESTION_WORDS = [
+    "؟", "?",
+    "كيف", "شلون", "اشلون", "كيفاش",
+    "ما", "ماذا", "شنو", "شو", "وش", "ايش", "إيش",
+    "متى", "امتى", "متين", "وقتاش",
+    "وين", "أين", "فين",
+    "كم", "شكم", "شقد", "قديش",
+    "هل", "ليش", "ليه", "لماذا", "علاش",
+    "اريد", "أريد", "ابغى", "ابي", "بدي",
+    "ممكن", "أقدر", "اقدر",
+]
+
 warnings_count = {}
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -64,15 +77,34 @@ CONGRATS_KEYWORDS = [
     "وصل مبلغي", "استلمته", "استلمت مبلغي",
     "سحب ناجح", "تم بنجاح", "الف شكر", "الف مبروك",
     "وصلت الاموال", "استلمت الفلوس", "وصل حسابي",
-    "شكرا لكم", "شكراً لكم", "الشكر للادارة", "الشكر للإدارة",
     "وصلني السحب", "وصل الحوالة", "تم التحويل",
     "استلمت المبلغ", "الحمد لله وصل", "الحمدلله وصل",
-    "مشكورين", "يسلمو", "تسلمون", "الله يبارك",
     "شكرا توب", "شكرا TOP", "TOP CASH شكرا",
     "وصلي الفلوس", "اجاني المبلغ", "اجاني السحب",
     "المبلغ وصل", "الفلوس وصلت", "الراتب وصل",
-    "احترافي شكرا", "منصة رائعة", "منصة ممتازة",
 ]
+
+def is_question(text: str, bot_username: str = None) -> bool:
+    """التحقق من أن الرسالة سؤال حقيقي"""
+    text_lower = text.lower().strip()
+
+    # إذا تم ذكر البوت مباشرة
+    if bot_username and f"@{bot_username.lower()}" in text_lower:
+        return True
+
+    # فحص كلمات الاستفهام - يجب تكون في بداية الرسالة أو ككلمة مستقلة
+    for word in QUESTION_WORDS:
+        # علامة السؤال يمكن تكون بأي مكان
+        if word in ["؟", "?"]:
+            if word in text:
+                return True
+        else:
+            # كلمات الاستفهام - نتحقق أنها كلمة مستقلة
+            pattern = r'(^|\s)' + re.escape(word) + r'($|\s)'
+            if re.search(pattern, text_lower):
+                return True
+
+    return False
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -136,16 +168,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # الحصول على الرد من ai_brain (قاعدة المعرفة + Claude AI)
+    # التحقق من أن الرسالة سؤال - وإلا لا يرد
+    bot_username = context.bot.username if context.bot else None
+    if not is_question(text, bot_username):
+        return
+
+    # الحصول على الرد
     try:
         answer, source = await get_ai_response(text, user_id)
 
-        # نرد على العضو في المجموعة إذا كان الرد من knowledge أو claude
         if source in ["knowledge", "claude", "fast", "cache"]:
             await msg.reply_text(answer)
             logger.info(f"✅ رد [{source}] لـ {user.first_name}")
 
-            # نرسل نسخة للأدمن للاطلاع
             for admin_id in ADMIN_IDS:
                 try:
                     await context.bot.send_message(
@@ -160,7 +195,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.error(f"admin notify: {e}")
         else:
-            # unknown - نرسل للأدمن فقط
             for admin_id in ADMIN_IDS:
                 try:
                     await context.bot.send_message(
@@ -170,7 +204,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f"👤 الاسم: {user.first_name}\n"
                             f"🆔 ID: {user_id}\n"
                             f"💬 {text}\n\n"
-                            f"⚠️ لا يوجد جواب في قاعدة البيانات"
+                            f"⚠️ لا يوجد جواب"
                         )
                     )
                 except Exception as e:
@@ -245,7 +279,6 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # تعيين app في ai_brain للسماح بإرسال رسائل للأدمن
     set_app(app)
 
     app.add_handler(CommandHandler("broadcast", broadcast))
