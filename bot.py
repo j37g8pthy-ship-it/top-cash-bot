@@ -25,7 +25,6 @@ AD_KEYWORDS = [
     "منصة أخرى", "فرصة ذهبية", "ربح سريع",
 ]
 
-# كلمات الاستفهام - البوت يرد فقط إذا الرسالة تحتوي واحدة منها
 QUESTION_WORDS = [
     "؟", "?",
     "كيف", "شلون", "اشلون", "كيفاش",
@@ -78,32 +77,24 @@ CONGRATS_KEYWORDS = [
     "سحب ناجح", "تم بنجاح", "الف شكر", "الف مبروك",
     "وصلت الاموال", "استلمت الفلوس", "وصل حسابي",
     "وصلني السحب", "وصل الحوالة", "تم التحويل",
-    "استلمت المبلغ", "الحمد لله وصل", "الحمدلله وصل",
+    "استلمت المبلغ",
     "شكرا توب", "شكرا TOP", "TOP CASH شكرا",
     "وصلي الفلوس", "اجاني المبلغ", "اجاني السحب",
     "المبلغ وصل", "الفلوس وصلت", "الراتب وصل",
 ]
 
 def is_question(text: str, bot_username: str = None) -> bool:
-    """التحقق من أن الرسالة سؤال حقيقي"""
     text_lower = text.lower().strip()
-
-    # إذا تم ذكر البوت مباشرة
     if bot_username and f"@{bot_username.lower()}" in text_lower:
         return True
-
-    # فحص كلمات الاستفهام - يجب تكون في بداية الرسالة أو ككلمة مستقلة
     for word in QUESTION_WORDS:
-        # علامة السؤال يمكن تكون بأي مكان
         if word in ["؟", "?"]:
             if word in text:
                 return True
         else:
-            # كلمات الاستفهام - نتحقق أنها كلمة مستقلة
             pattern = r'(^|\s)' + re.escape(word) + r'($|\s)'
             if re.search(pattern, text_lower):
                 return True
-
     return False
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -118,7 +109,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMIN_IDS:
         return
 
-    # فلترة الروابط والإعلانات
     has_link = bool(LINK_PATTERN.search(text))
     has_ad = any(kw in text for kw in AD_KEYWORDS)
 
@@ -157,7 +147,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -168,12 +157,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # التحقق من أن الرسالة سؤال - وإلا لا يرد
     bot_username = context.bot.username if context.bot else None
     if not is_question(text, bot_username):
         return
 
-    # الحصول على الرد
     try:
         answer, source = await get_ai_response(text, user_id)
 
