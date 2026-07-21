@@ -149,14 +149,6 @@ async def weekly_closing(app):
     msg = random.choice(WEEKLY_CLOSING)
     await send_to_all(app, msg)
 
-async def friday_greeting(app):
-    await send_to_all(app,
-        "🕌 جمعة مباركة على جميع أعضاء TOP CASH\n\n"
-        "تقبل الله منا ومنكم صالح الأعمال.\n\n"
-        "نتمنى لكم جمعة مباركة وإجازة سعيدة. 🌹\n\n"
-        "💙 إدارة TOP CASH"
-    )
-
 async def sunday_reminder(app):
     await send_to_all(app,
         "🌟 أهلاً بكم في أسبوع جديد!\n\n"
@@ -229,7 +221,6 @@ def setup_scheduler(app):
     scheduler.add_job(meeting_reminder, CronTrigger(hour=15, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
     scheduler.add_job(send_daily_meeting, CronTrigger(hour=22, minute=0, day_of_week='0,1,2,3,4', timezone=tz), args=[app])
     scheduler.add_job(weekly_closing, CronTrigger(hour=20, minute=0, day_of_week='4', timezone=tz), args=[app])
-    scheduler.add_job(friday_greeting, CronTrigger(hour=10, minute=0, day_of_week='5', timezone=tz), args=[app])
     scheduler.add_job(sunday_reminder, CronTrigger(hour=11, minute=30, day_of_week='0', timezone=tz), args=[app])
     scheduler.add_job(daily_stats, CronTrigger(hour=21, minute=30, timezone=tz), args=[app])
     scheduler.add_job(send_tasks_report, CronTrigger(hour=21, minute=0, timezone=tz), args=[app])
