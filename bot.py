@@ -35,6 +35,9 @@ QUESTION_WORDS = [
     "هل", "ليش", "ليه", "لماذا", "علاش",
     "اريد", "أريد", "ابغى", "ابي", "بدي",
     "ممكن", "أقدر", "اقدر",
+    "مرحبا", "هلا", "اهلا", "السلام", "هلو", "هاي",
+    "انا مشترك", "انا عضو", "انا جديد", "مشترك جديد",
+    "سجلت", "اشتركت", "فعلت",
 ]
 
 warnings_count = {}
@@ -81,6 +84,15 @@ CONGRATS_KEYWORDS = [
     "شكرا توب", "شكرا TOP", "TOP CASH شكرا",
     "وصلي الفلوس", "اجاني المبلغ", "اجاني السحب",
     "المبلغ وصل", "الفلوس وصلت", "الراتب وصل",
+    "تم وصول السحب", "تم وصول لسحب", "وصول السحب",
+    "تم وصول", "تم استلامي", "وصل لحسابي",
+    "شكرا شركة", "شكرا للشركه", "شكرا للمصداقيه",
+    "المصداقيه المستمره", "سعدين", "سعيدين",
+    "شركه توب كاش", "شركة توب كاش", "توب كاش شكرا",
+    "نحن سعدين", "نحن سعيدين", "نعمل معكم",
+    "بعمل معكم", "بالعمل معكم", "المصداقية",
+    "شكرا لسحب", "شكرا للسحب", "شكرا سحب",
+    "وصلني", "استلمت السحب", "استلمت الاموال",
 ]
 
 def is_question(text: str, bot_username: str = None) -> bool:
@@ -108,6 +120,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id in ADMIN_IDS:
         return
+
+    # ⚠️ إذا الرسالة رد على رسالة عضو آخر (وليست رد على البوت) → تجاهل
+    if msg.reply_to_message and msg.reply_to_message.from_user:
+        replied_user = msg.reply_to_message.from_user
+        bot_username = context.bot.username if context.bot else None
+        # إذا الرد ليس على البوت → تجاهل
+        if replied_user.username != bot_username and not replied_user.is_bot:
+            return
 
     has_link = bool(LINK_PATTERN.search(text))
     has_ad = any(kw in text for kw in AD_KEYWORDS)
@@ -147,6 +167,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
+    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -163,6 +184,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         answer, source = await get_ai_response(text, user_id)
+
+        # إزالة النجوم والرموز
+        answer = answer.replace("**", "").replace("*", "").replace("###", "").replace("##", "").replace("#", "")
 
         if source in ["knowledge", "claude", "fast", "cache"]:
             await msg.reply_text(answer)
