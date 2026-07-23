@@ -242,7 +242,6 @@ async def get_ai_response(user_question: str, user_id: int = 0) -> tuple:
     ai_answer = await ask_claude(user_question, user_id)
     if ai_answer:
         db.log_conversation(user_id, user_question, ai_answer, "claude", time.time()-start)
-        await notify_admin(user_question, user_id)
         return ai_answer, "claude"
 
     answer = (
