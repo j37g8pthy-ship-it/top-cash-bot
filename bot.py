@@ -196,20 +196,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if source in ["knowledge", "claude", "fast", "cache"]:
             await msg.reply_text(answer)
             logger.info(f"✅ رد [{source}] لـ {user.first_name}")
-
-            for admin_id in ADMIN_IDS:
-                try:
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=(
-                            f"❓ سؤال من عضو [{source}]\n\n"
-                            f"👤 الاسم: {user.first_name}\n"
-                            f"💬 {text}\n\n"
-                            f"📌 تم الرد تلقائياً في المجموعة"
-                        )
-                    )
-                except Exception as e:
-                    logger.error(f"admin notify: {e}")
         else:
             for admin_id in ADMIN_IDS:
                 try:
