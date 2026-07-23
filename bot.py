@@ -6,7 +6,7 @@ from config import BOT_TOKEN, ADMIN_IDS, GROUP_ID, GROUP_IDS
 from database import db
 from scheduler import setup_scheduler
 from knowledge_base import init_knowledge
-from ai_brain import get_ai_response, set_app
+from ai_brain import get_ai_response, set_app, conversation_memory
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -121,12 +121,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in ADMIN_IDS:
         return
 
-    # ⚠️ إذا الرسالة رد على رسالة عضو آخر (وليست رد على البوت) → تجاهل
+    bot_username = context.bot.username if context.bot else None
+    is_reply_to_bot = False
+
+    # التحقق إذا كانت الرسالة رد على البوت
     if msg.reply_to_message and msg.reply_to_message.from_user:
         replied_user = msg.reply_to_message.from_user
-        bot_username = context.bot.username if context.bot else None
-        # إذا الرد ليس على البوت → تجاهل
-        if replied_user.username != bot_username and not replied_user.is_bot:
+        if replied_user.username == bot_username or replied_user.is_bot:
+            is_reply_to_bot = True
+        else:
+            # رد على عضو آخر → تجاهل
             return
 
     has_link = bool(LINK_PATTERN.search(text))
@@ -167,7 +171,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"ban error: {e}")
         return
 
-    # فحص كلمات التهنئة - يرد مباشرة في المجموعة
     is_congrats = any(kw in text.lower() for kw in CONGRATS_KEYWORDS)
     if is_congrats:
         await msg.reply_text(
@@ -178,8 +181,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    bot_username = context.bot.username if context.bot else None
-    if not is_question(text, bot_username):
+    # إذا كان رد على البوت أو له تاريخ محادثة → يرد بدون فحص السؤال
+    has_conversation = user_id in conversation_memory and len(conversation_memory[user_id]) > 0
+
+    if not (is_reply_to_bot or has_conversation or is_question(text, bot_username)):
         return
 
     try:
@@ -214,8 +219,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f"❓ سؤال بدون إجابة\n\n"
                             f"👤 الاسم: {user.first_name}\n"
                             f"🆔 ID: {user_id}\n"
-                            f"💬 {text}\n\n"
-                            f"⚠️ لا يوجد جواب"
+                            f"💬 {text}"
                         )
                     )
                 except Exception as e:
